@@ -987,7 +987,7 @@ static vec4f trace_naive(const scene_model* scene, const ray3f& ray_,
     auto normal   = eval_shading_normal(instance, element, uv, outgoing);
     auto emission = eval_emission(instance, element, uv, normal, outgoing);
     auto opacity  = eval_opacity(instance, element, uv, normal, outgoing);
-    auto bsdf     = eval_bsdf(instance, element, uv, normal, outgoing);
+    auto bsdf     = eval_bsdf_(instance, element, uv, normal, outgoing);
 
     // handle opacity
     if (opacity < 1 && rand1f(rng) >= opacity) {
@@ -1002,7 +1002,7 @@ static vec4f trace_naive(const scene_model* scene, const ray3f& ray_,
 
     // next direction
     auto incoming = zero3f;
-    if (bsdf.roughness) {
+    if (!is_delta(bsdf)) {
       incoming = sample_bsdfcos(
           bsdf, normal, outgoing, rand1f(rng), rand2f(rng));
       weight *= eval_bsdfcos(bsdf, normal, outgoing, incoming) /
@@ -1058,7 +1058,7 @@ static vec4f trace_eyelight(const scene_model* scene, const ray3f& ray_,
     auto normal   = eval_shading_normal(instance, element, uv, outgoing);
     auto emission = eval_emission(instance, element, uv, normal, outgoing);
     auto opacity  = eval_opacity(instance, element, uv, normal, outgoing);
-    auto bsdf     = eval_bsdf(instance, element, uv, normal, outgoing);
+    auto bsdf     = eval_bsdf_(instance, element, uv, normal, outgoing);
 
     // handle opacity
     if (opacity < 1 && rand1f(rng) >= opacity) {
@@ -1076,7 +1076,7 @@ static vec4f trace_eyelight(const scene_model* scene, const ray3f& ray_,
     radiance += weight * pif * eval_bsdfcos(bsdf, normal, outgoing, incoming);
 
     // continue path
-    if (bsdf.roughness) break;
+    if (!is_delta(bsdf)) break;
     incoming = sample_delta(bsdf, normal, outgoing, rand1f(rng));
     weight *= eval_delta(bsdf, normal, outgoing, incoming) /
               sample_delta_pdf(bsdf, normal, outgoing, incoming);
@@ -1110,13 +1110,39 @@ static vec4f trace_falsecolor(const scene_model* scene, const ray3f& ray,
   auto color    = eval_color(instance, element, uv);
   auto emission = eval_emission(instance, element, uv, normal, outgoing);
   auto opacity  = eval_opacity(instance, element, uv, normal, outgoing);
-  auto bsdf     = eval_bsdf(instance, element, uv, normal, outgoing);
+  auto bsdf     = eval_bsdf_(instance, element, uv, normal, outgoing);
 
   // hash color
   auto hashed_color = [](int id) {
     auto hashed = std::hash<int>()(id);
     auto rng    = make_rng(trace_default_seed, hashed);
     return pow(0.5f + 0.5f * rand3f(rng), 2.2f);
+  };
+
+  // sum bsdf weights
+  auto sum_weigths = [](const trace_bsdf& bsdfs, trace_bsdf_type type) {
+    auto weight = zero3f;
+    for (auto& bsdf : bsdfs.bsdfs) weight += bsdf.weight;
+    return vec4f{weight.x, weight.y, weight.z, 1};
+  };
+
+  // max roughness
+  auto max_roughness = [](const trace_bsdf& bsdfs) {
+    auto max_roughness = 0.0f;
+    for (auto& bsdf : bsdfs.bsdfs)
+      max_roughness = max(max_roughness, bsdf.roughness);
+    return vec4f{max_roughness, max_roughness, max_roughness, 1};
+  };
+
+  // specular ior
+  auto specular_ior = [](const trace_bsdf& bsdfs) {
+    auto specular_ior = 1.0f;
+    for (auto& bsdf : bsdfs.bsdfs)
+      if (bsdf.type == trace_bsdf_type::specular ||
+          bsdf.type == trace_bsdf_type::transmission ||
+          bsdf.type == trace_bsdf_type::refraction)
+        specular_ior = bsdf.ior;
+    return vec4f{specular_ior, specular_ior, specular_ior, 1};
   };
 
   // make vec4f
@@ -1140,19 +1166,23 @@ static vec4f trace_falsecolor(const scene_model* scene, const ray3f& ray,
       return {fmod(texcoord.x, 1.0f), fmod(texcoord.y, 1.0f), 0, 1};
     case trace_falsecolor_type::color: return make_vec(color, 1);
     case trace_falsecolor_type::emission: return make_vec(emission, 1);
-    case trace_falsecolor_type::diffuse: return make_vec(bsdf.diffuse, 1);
-    case trace_falsecolor_type::specular: return make_vec(bsdf.specular, 1);
-    case trace_falsecolor_type::coat: return make_vec(bsdf.coat, 1);
-    case trace_falsecolor_type::metal: return make_vec(bsdf.metal, 1);
+    case trace_falsecolor_type::diffuse:
+      return sum_weigths(bsdf, trace_bsdf_type::diffuse);
+    case trace_falsecolor_type::specular:
+      return sum_weigths(bsdf, trace_bsdf_type::specular);
+    case trace_falsecolor_type::coat:
+      return sum_weigths(bsdf, trace_bsdf_type::specular);
+    case trace_falsecolor_type::metal:
+      return sum_weigths(bsdf, trace_bsdf_type::metal);
     case trace_falsecolor_type::transmission:
-      return make_vec(bsdf.transmission, 1);
+      return sum_weigths(bsdf, trace_bsdf_type::transmission);
     case trace_falsecolor_type::translucency:
-      return make_vec(bsdf.translucency, 1);
-    case trace_falsecolor_type::refraction: return make_vec(bsdf.refraction, 1);
-    case trace_falsecolor_type::roughness:
-      return {bsdf.roughness, bsdf.roughness, bsdf.roughness, 1};
+      return sum_weigths(bsdf, trace_bsdf_type::translucency);
+    case trace_falsecolor_type::refraction:
+      return sum_weigths(bsdf, trace_bsdf_type::refraction);
+    case trace_falsecolor_type::roughness: return max_roughness(bsdf);
     case trace_falsecolor_type::opacity: return {opacity, opacity, opacity, 1};
-    case trace_falsecolor_type::ior: return {bsdf.ior, bsdf.ior, bsdf.ior, 1};
+    case trace_falsecolor_type::ior: return specular_ior(bsdf);
     case trace_falsecolor_type::element:
       return make_vec(hashed_color(intersection.element), 1);
     case trace_falsecolor_type::instance:
