@@ -326,7 +326,6 @@ int main(int argc, const char* argv[]) {
     if (app->render_counter > 10) app->render_counter = 0;
   };
   callbacks.widgets_cb = [app](gui_window* win, const gui_input& input) {
-    begin_imgui(win);
     auto  edited  = 0;
     auto& tparams = app->params;
     draw_progressbar(win, "render", app->current, app->total);
@@ -346,7 +345,6 @@ int main(int argc, const char* argv[]) {
     edited += draw_slider(win, "pratio", tparams.pratio, 1, 64);
     edited += draw_slider(win, "exposure", app->exposure, -5, 5);
     if (edited) reset_display(app);
-    end_imgui(win);
   };
   callbacks.char_cb = [app](gui_window* win, unsigned int key,
                           const gui_input& input) {

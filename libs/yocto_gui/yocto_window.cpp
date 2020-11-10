@@ -215,7 +215,8 @@ void init_window(gui_window* win, const vec2i& size, const string& title,
       });
   glfwSetCharCallback(win->win, [](GLFWwindow* glfw, unsigned int key) {
     auto win = (gui_window*)glfwGetWindowUserPointer(glfw);
-    if (win->char_cb) win->char_cb(win, key, win->input);
+    update_button_from_input(win->input.key_buttons[key], true);
+    // if (win->char_cb) win->char_cb(win, key, win->input);
   });
   glfwSetMouseButtonCallback(
       win->win, [](GLFWwindow* glfw, int button, int action, int mods) {
@@ -228,9 +229,10 @@ void init_window(gui_window* win, const vec2i& size, const string& title,
         } else if (button == GLFW_MOUSE_BUTTON_MIDDLE) {
           update_button_from_input(win->input.mouse_middle, press);
         }
-        if (win->click_cb)
-          win->click_cb(
-              win, button == GLFW_MOUSE_BUTTON_LEFT, (bool)action, win->input);
+        // if (win->click_cb)
+        //   win->click_cb(
+        //       win, button == GLFW_MOUSE_BUTTON_LEFT, (bool)action,
+        //       win->input);
       });
   glfwSetScrollCallback(
       win->win, [](GLFWwindow* glfw, double xoffset, double yoffset) {
@@ -290,6 +292,67 @@ void clear_window(gui_window* win) {
   win->win = nullptr;
 }
 
+static void update_input(gui_input& input, const gui_window* win) {
+  input.mouse_last = input.mouse_pos;
+  auto mouse_posx = 0.0, mouse_posy = 0.0;
+  glfwGetCursorPos(win->win, &mouse_posx, &mouse_posy);
+  input.mouse_pos = vec2f{(float)mouse_posx, (float)mouse_posy};
+  if (win->widgets_width && win->widgets_left)
+    input.mouse_pos.x -= win->widgets_width;
+  //    input.mouse_left = glfwGetMouseButton(
+  //                                win->win, GLFW_MOUSE_BUTTON_LEFT) ==
+  //                                GLFW_PRESS;
+  //    input.mouse_right =
+  //        glfwGetMouseButton(win->win, GLFW_MOUSE_BUTTON_RIGHT) ==
+  //        GLFW_PRESS;
+  input.modifier_alt = glfwGetKey(win->win, GLFW_KEY_LEFT_ALT) == GLFW_PRESS ||
+                       glfwGetKey(win->win, GLFW_KEY_RIGHT_ALT) == GLFW_PRESS;
+  input.modifier_shift =
+      glfwGetKey(win->win, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS ||
+      glfwGetKey(win->win, GLFW_KEY_RIGHT_SHIFT) == GLFW_PRESS;
+  input.modifier_ctrl =
+      glfwGetKey(win->win, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS ||
+      glfwGetKey(win->win, GLFW_KEY_RIGHT_CONTROL) == GLFW_PRESS;
+  glfwGetWindowSize(win->win, &input.window_size.x, &input.window_size.y);
+  if (win->widgets_width) input.window_size.x -= win->widgets_width;
+  glfwGetFramebufferSize(
+      win->win, &input.framebuffer_viewport.z, &input.framebuffer_viewport.w);
+  input.framebuffer_viewport.x = 0;
+  input.framebuffer_viewport.y = 0;
+  if (win->widgets_width) {
+    auto win_size = zero2i;
+    glfwGetWindowSize(win->win, &win_size.x, &win_size.y);
+    auto offset = (int)(win->widgets_width *
+                        (float)input.framebuffer_viewport.z / win_size.x);
+    input.framebuffer_viewport.z -= offset;
+    if (win->widgets_left) input.framebuffer_viewport.x += offset;
+  }
+  if (win->widgets_width) {
+    // TODO(giacomo): restore this
+    // auto io                   = &ImGui::GetIO();
+    // input.widgets_active = io->WantTextInput || io->WantCaptureMouse
+    // ||
+    //                             io->WantCaptureKeyboard;
+  }
+
+  // time
+  input.clock_last = input.clock_now;
+  input.clock_now =
+      std::chrono::high_resolution_clock::now().time_since_epoch().count();
+  input.time_now   = (double)input.clock_now / 1000000000.0;
+  input.time_delta = (double)(input.clock_now - input.clock_last) /
+                     1000000000.0;
+}
+
+void update_input_for_next_frame(gui_input& input) {
+  update_button_for_next_frame(input.mouse_left);
+  update_button_for_next_frame(input.mouse_right);
+  for (auto& key : input.key_buttons) {
+    update_button_for_next_frame(key);
+  }
+  input.scroll = zero2f;
+}
+
 // Run loop
 void run_ui(gui_window* win) {
   // init
@@ -298,58 +361,39 @@ void run_ui(gui_window* win) {
   // loop
   while (!glfwWindowShouldClose(win->win)) {
     // update input
-    win->input.mouse_last = win->input.mouse_pos;
-    auto mouse_posx = 0.0, mouse_posy = 0.0;
-    glfwGetCursorPos(win->win, &mouse_posx, &mouse_posy);
-    win->input.mouse_pos = vec2f{(float)mouse_posx, (float)mouse_posy};
-    if (win->widgets_width && win->widgets_left)
-      win->input.mouse_pos.x -= win->widgets_width;
-    //    win->input.mouse_left = glfwGetMouseButton(
-    //                                win->win, GLFW_MOUSE_BUTTON_LEFT) ==
-    //                                GLFW_PRESS;
-    //    win->input.mouse_right =
-    //        glfwGetMouseButton(win->win, GLFW_MOUSE_BUTTON_RIGHT) ==
-    //        GLFW_PRESS;
-    win->input.modifier_alt =
-        glfwGetKey(win->win, GLFW_KEY_LEFT_ALT) == GLFW_PRESS ||
-        glfwGetKey(win->win, GLFW_KEY_RIGHT_ALT) == GLFW_PRESS;
-    win->input.modifier_shift =
-        glfwGetKey(win->win, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS ||
-        glfwGetKey(win->win, GLFW_KEY_RIGHT_SHIFT) == GLFW_PRESS;
-    win->input.modifier_ctrl =
-        glfwGetKey(win->win, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS ||
-        glfwGetKey(win->win, GLFW_KEY_RIGHT_CONTROL) == GLFW_PRESS;
-    glfwGetWindowSize(
-        win->win, &win->input.window_size.x, &win->input.window_size.y);
-    if (win->widgets_width) win->input.window_size.x -= win->widgets_width;
-    glfwGetFramebufferSize(win->win, &win->input.framebuffer_viewport.z,
-        &win->input.framebuffer_viewport.w);
-    win->input.framebuffer_viewport.x = 0;
-    win->input.framebuffer_viewport.y = 0;
-    if (win->widgets_width) {
-      auto win_size = zero2i;
-      glfwGetWindowSize(win->win, &win_size.x, &win_size.y);
-      auto offset = (int)(win->widgets_width *
-                          (float)win->input.framebuffer_viewport.z /
-                          win_size.x);
-      win->input.framebuffer_viewport.z -= offset;
-      if (win->widgets_left) win->input.framebuffer_viewport.x += offset;
-    }
-    if (win->widgets_width) {
-      // TODO(giacomo): restore this
-      // auto io                   = &ImGui::GetIO();
-      // win->input.widgets_active = io->WantTextInput || io->WantCaptureMouse
-      // ||
-      //                             io->WantCaptureKeyboard;
+    update_input(win->input, win);
+
+    // key input
+    if (win->char_cb) {
+      for (auto i = 0; i < win->input.key_buttons.size(); i++) {
+        if (win->input.key_buttons[i].state == gui_button::state::pressing) {
+          win->char_cb(win, i, win->input);
+        }
+      }
     }
 
-    // time
-    win->input.clock_last = win->input.clock_now;
-    win->input.clock_now =
-        std::chrono::high_resolution_clock::now().time_since_epoch().count();
-    win->input.time_now = (double)win->input.clock_now / 1000000000.0;
-    win->input.time_delta =
-        (double)(win->input.clock_now - win->input.clock_last) / 1000000000.0;
+    // mouse click
+    if (win->click_cb) {
+      {
+        auto pressing =
+            (win->input.mouse_left.state == gui_button::state::pressing);
+        auto releasing =
+            (win->input.mouse_left.state == gui_button::state::releasing);
+        if (pressing || releasing) {
+          win->click_cb(win, true, pressing, win->input);
+        }
+      }
+
+      {
+        auto pressing =
+            (win->input.mouse_right.state == gui_button::state::pressing);
+        auto releasing =
+            (win->input.mouse_right.state == gui_button::state::releasing);
+        if (pressing || releasing) {
+          win->click_cb(win, false, pressing, win->input);
+        }
+      }
+    }
 
     // update ui
     if (win->uiupdate_cb && !win->input.widgets_active)
@@ -361,7 +405,9 @@ void run_ui(gui_window* win) {
     // draw
     draw_window(win);
 
-    // event hadling
+    update_input_for_next_frame(win->input);
+
+    // event handling
     glfwPollEvents();
   }
 
