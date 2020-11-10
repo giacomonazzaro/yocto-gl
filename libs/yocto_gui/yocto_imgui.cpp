@@ -93,6 +93,22 @@ void init_glwidgets(gui_window* win, int width, bool left) {
 }
 
 bool begin_header(gui_window* win, const char* lbl) {
+  if (win->widgets && !win->widgets_are_initialized) {
+    // TODO(giacomo): ???
+    // widgets
+    ImGui::CreateContext();
+    ImGui::GetIO().IniFilename       = nullptr;
+    ImGui::GetStyle().WindowRounding = 0;
+    ImGui_ImplGlfw_InitForOpenGL(win->win, true);
+#ifndef __APPLE__
+    ImGui_ImplOpenGL3_Init();
+#else
+    ImGui_ImplOpenGL3_Init("#version 330");
+#endif
+    ImGui::StyleColorsDark();
+    win->widgets_are_initialized = true;
+  }
+
   if (!ImGui::CollapsingHeader(lbl)) return false;
   ImGui::PushID(lbl);
   return true;

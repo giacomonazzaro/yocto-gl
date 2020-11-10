@@ -250,6 +250,10 @@ void init_window(gui_window* win, const vec2i& size, const string& title,
   if (!gladLoadGL())
     throw std::runtime_error{"cannot initialize OpenGL extensions"};
 
+  // TODO(giacomo): ???
+  win->widgets       = true;
+  win->widgets_width = widgets_width;
+  win->widgets_left  = widgets_left;
   // widgets
   //   if (widgets) {
   //     ImGui::CreateContext();

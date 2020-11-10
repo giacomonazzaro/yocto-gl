@@ -161,12 +161,14 @@ namespace yocto {
 
 // OpenGL window wrapper
 struct gui_window {
-  GLFWwindow* win           = nullptr;
-  string      title         = "";
-  int         widgets_width = 0;
-  bool        widgets_left  = true;
-  gui_input   input         = {};
-  vec4f       background    = {0.15f, 0.15f, 0.15f, 1.0f};
+  GLFWwindow* win                     = nullptr;
+  string      title                   = "";
+  bool        widgets                 = false;
+  bool        widgets_are_initialized = false;
+  int         widgets_width           = 0;
+  bool        widgets_left            = true;
+  gui_input   input                   = {};
+  vec4f       background              = {0.15f, 0.15f, 0.15f, 1.0f};
 
   // callbacks
   init_callback     init_cb     = {};
