@@ -52,6 +52,9 @@ using std::vector;
 // -----------------------------------------------------------------------------
 namespace yocto {
 
+bool begin_imgui(gui_window* win);
+void end_imgui(gui_window* win);
+
 bool begin_header(gui_window* win, const char* title);
 void end_header(gui_window* win);
 

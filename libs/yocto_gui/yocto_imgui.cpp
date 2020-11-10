@@ -76,23 +76,7 @@ using namespace std::string_literals;
 // -----------------------------------------------------------------------------
 namespace yocto {
 
-void init_glwidgets(gui_window* win, int width, bool left) {
-  // init widgets
-  ImGui::CreateContext();
-  ImGui::GetIO().IniFilename       = nullptr;
-  ImGui::GetStyle().WindowRounding = 0;
-  ImGui_ImplGlfw_InitForOpenGL(win->win, true);
-#ifndef __APPLE__
-  ImGui_ImplOpenGL3_Init();
-#else
-  ImGui_ImplOpenGL3_Init("#version 330");
-#endif
-  ImGui::StyleColorsDark();
-  win->widgets_width = width;
-  win->widgets_left  = left;
-}
-
-bool begin_header(gui_window* win, const char* lbl) {
+bool begin_imgui(gui_window* win) {
   if (win->widgets && !win->widgets_are_initialized) {
     // TODO(giacomo): ???
     // widgets
@@ -109,6 +93,44 @@ bool begin_header(gui_window* win, const char* lbl) {
     win->widgets_are_initialized = true;
   }
 
+  ImGui_ImplOpenGL3_NewFrame();
+  ImGui_ImplGlfw_NewFrame();
+  ImGui::NewFrame();
+  auto window = zero2i;
+  glfwGetWindowSize(win->win, &window.x, &window.y);
+  if (win->widgets_left) {
+    ImGui::SetNextWindowPos({0, 0});
+    ImGui::SetNextWindowSize({(float)win->widgets_width, (float)window.y});
+  } else {
+    ImGui::SetNextWindowPos({(float)(window.x - win->widgets_width), 0});
+    ImGui::SetNextWindowSize({(float)win->widgets_width, (float)window.y});
+  }
+  ImGui::SetNextWindowCollapsed(false);
+  ImGui::SetNextWindowBgAlpha(1);
+
+  return (ImGui::Begin(win->title.c_str(), nullptr,
+      ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
+          ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse |
+          ImGuiWindowFlags_NoSavedSettings));
+
+  // if (ImGui::Begin(win->title.c_str(), nullptr,
+  //         ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
+  //             ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse |
+  //             ImGuiWindowFlags_NoSavedSettings)) {
+  //   win->widgets_cb(win, win->input);
+  // }
+  // ImGui::End();
+  // ImGui::Render();
+  // ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+}
+
+void end_imgui(gui_window* win) {
+  ImGui::End();
+  ImGui::Render();
+  ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+}
+
+bool begin_header(gui_window* win, const char* lbl) {
   if (!ImGui::CollapsingHeader(lbl)) return false;
   ImGui::PushID(lbl);
   return true;

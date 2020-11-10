@@ -123,11 +123,17 @@ inline void update_button_for_next_frame(gui_button& button) {
   }
 }
 
+// TODO(giacomo): forward declarations, this is dirty...
+bool begin_imgui(gui_window* win);
+void end_imgui(gui_window* win);
+
 static void draw_window(gui_window* win) {
   glClearColor(win->background.x, win->background.y, win->background.z,
       win->background.w);
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
   if (win->draw_cb) win->draw_cb(win, win->input);
+
+  // TODO(giacomo): restore widgets draw
   // if (win->widgets_cb) {
   //   ImGui_ImplOpenGL3_NewFrame();
   //   ImGui_ImplGlfw_NewFrame();
@@ -153,6 +159,13 @@ static void draw_window(gui_window* win) {
   //   ImGui::Render();
   //   ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
   // }
+  if (win->widgets_cb) {
+    if (begin_imgui(win)) {
+      win->widgets_cb(win, win->input);
+      end_imgui(win);
+    }
+  }
+
   glfwSwapBuffers(win->win);
 }
 
