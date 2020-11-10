@@ -32,6 +32,7 @@
 
 #include <yocto/yocto_math.h>
 
+#include <array>
 #include <functional>
 #include <string>
 #include <vector>
@@ -42,6 +43,7 @@
 namespace yocto {
 
 // using directives
+using std::array;
 using std::function;
 using std::string;
 using std::vector;
@@ -59,24 +61,46 @@ namespace yocto {
 // Forward declaration of OpenGL window
 struct gui_window;
 
+struct gui_button {
+  enum struct state : unsigned char {
+    up = 0,
+    down,
+    releasing,
+    pressing,
+  };
+  state state = state::up;
+
+  // TODO(giacomo): needed to keep same API for now
+  operator bool() const { return state == state::down; }
+};
+
 // Input state
 struct gui_input {
-  bool     mouse_left           = false;  // left button
-  bool     mouse_right          = false;  // right button
-  bool     mouse_middle         = false;  // middle button
-  vec2f    mouse_pos            = {};     // position excluding widgets
-  vec2f    mouse_last           = {};  // last mouse position excluding widgets
-  vec2f    mouse_delta          = {};  // last mouse delta excluding widgets
-  bool     modifier_alt         = false;         // alt modifier
-  bool     modifier_ctrl        = false;         // ctrl modifier
-  bool     modifier_shift       = false;         // shift modifier
-  bool     widgets_active       = false;         // widgets are active
-  uint64_t clock_now            = 0;             // clock now
-  uint64_t clock_last           = 0;             // clock last
-  double   time_now             = 0;             // time now
-  double   time_delta           = 0;             // time delta
-  vec2i    window_size          = {0, 0};        // window size
-  vec4i    framebuffer_viewport = {0, 0, 0, 0};  // framebuffer viewport
+  // Ever-changing data
+  vec2f    mouse_pos  = {0, 0};  // position excluding gui
+  vec2f    mouse_last = {0, 0};  // last mouse position excluding gui
+  uint64_t clock_now  = 0;       // clock now
+  uint64_t clock_last = 0;       // clock last
+  double   time_now   = 0;       // time now
+  double   time_delta = 0;       // time delta
+  int      frame      = 0;
+
+  gui_button mouse_left   = {};
+  gui_button mouse_middle = {};
+  gui_button mouse_right  = {};
+  vec2f      scroll       = {0, 0};  // scroll input
+
+  bool modifier_alt   = false;  // alt modifier
+  bool modifier_ctrl  = false;  // ctrl modifier
+  bool modifier_shift = false;  // shift modifier
+
+  vec2i window_size          = {0, 0};
+  vec4i framebuffer_viewport = {0, 0, 0, 0};
+  vec2i framebuffer_size     = {0, 0};
+  bool  is_window_focused    = false;  // window is focused
+  bool  widgets_active       = false;
+
+  std::array<gui_button, 512> key_buttons = {};
 };
 
 // Init callback called after the window has opened
@@ -137,23 +161,25 @@ namespace yocto {
 
 // OpenGL window wrapper
 struct gui_window {
-  GLFWwindow*       win           = nullptr;
-  string            title         = "";
-  init_callback     init_cb       = {};
-  clear_callback    clear_cb      = {};
-  draw_callback     draw_cb       = {};
-  widgets_callback  widgets_cb    = {};
-  drop_callback     drop_cb       = {};
-  key_callback      key_cb        = {};
-  char_callback     char_cb       = {};
-  click_callback    click_cb      = {};
-  scroll_callback   scroll_cb     = {};
-  update_callback   update_cb     = {};
-  uiupdate_callback uiupdate_cb   = {};
-  int               widgets_width = 0;
-  bool              widgets_left  = true;
-  gui_input         input         = {};
-  vec4f             background    = {0.15f, 0.15f, 0.15f, 1.0f};
+  GLFWwindow* win           = nullptr;
+  string      title         = "";
+  int         widgets_width = 0;
+  bool        widgets_left  = true;
+  gui_input   input         = {};
+  vec4f       background    = {0.15f, 0.15f, 0.15f, 1.0f};
+
+  // callbacks
+  init_callback     init_cb     = {};
+  clear_callback    clear_cb    = {};
+  draw_callback     draw_cb     = {};
+  widgets_callback  widgets_cb  = {};
+  drop_callback     drop_cb     = {};
+  key_callback      key_cb      = {};
+  char_callback     char_cb     = {};
+  click_callback    click_cb    = {};
+  scroll_callback   scroll_cb   = {};
+  update_callback   update_cb   = {};
+  uiupdate_callback uiupdate_cb = {};
 };
 
 // Windows initialization

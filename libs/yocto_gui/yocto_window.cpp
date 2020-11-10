@@ -106,6 +106,23 @@ void run_ui(const vec2i& size, const string& title,
 // -----------------------------------------------------------------------------
 namespace yocto {
 
+inline void update_button_from_input(gui_button& button, bool pressing) {
+  if (pressing) {
+    assert(button.state != gui_button::state::down);
+    button.state = gui_button::state::pressing;
+  } else {
+    button.state = gui_button::state::releasing;
+  }
+}
+
+inline void update_button_for_next_frame(gui_button& button) {
+  if (button.state == gui_button::state::pressing) {
+    button.state = gui_button::state::down;
+  } else if (button.state == gui_button::state::releasing) {
+    button.state = gui_button::state::up;
+  }
+}
+
 static void draw_window(gui_window* win) {
   glClearColor(win->background.x, win->background.y, win->background.z,
       win->background.w);
@@ -178,7 +195,9 @@ void init_window(gui_window* win, const vec2i& size, const string& title,
       });
   glfwSetKeyCallback(win->win,
       [](GLFWwindow* glfw, int key, int scancode, int action, int mods) {
-        auto win = (gui_window*)glfwGetWindowUserPointer(glfw);
+        auto win   = (gui_window*)glfwGetWindowUserPointer(glfw);
+        auto press = (action == GLFW_PRESS);
+        update_button_from_input(win->input.key_buttons[key], press);
         if (win->key_cb) win->key_cb(win, key, (bool)action, win->input);
       });
   glfwSetCharCallback(win->win, [](GLFWwindow* glfw, unsigned int key) {
@@ -187,14 +206,23 @@ void init_window(gui_window* win, const vec2i& size, const string& title,
   });
   glfwSetMouseButtonCallback(
       win->win, [](GLFWwindow* glfw, int button, int action, int mods) {
-        auto win = (gui_window*)glfwGetWindowUserPointer(glfw);
+        auto win   = (gui_window*)glfwGetWindowUserPointer(glfw);
+        auto press = (action == GLFW_PRESS);
+        if (button == GLFW_MOUSE_BUTTON_LEFT) {
+          update_button_from_input(win->input.mouse_left, press);
+        } else if (button == GLFW_MOUSE_BUTTON_RIGHT) {
+          update_button_from_input(win->input.mouse_right, press);
+        } else if (button == GLFW_MOUSE_BUTTON_MIDDLE) {
+          update_button_from_input(win->input.mouse_middle, press);
+        }
         if (win->click_cb)
           win->click_cb(
               win, button == GLFW_MOUSE_BUTTON_LEFT, (bool)action, win->input);
       });
   glfwSetScrollCallback(
       win->win, [](GLFWwindow* glfw, double xoffset, double yoffset) {
-        auto win = (gui_window*)glfwGetWindowUserPointer(glfw);
+        auto win          = (gui_window*)glfwGetWindowUserPointer(glfw);
+        win->input.scroll = {(float)xoffset, (float)yoffset};
         if (win->scroll_cb) win->scroll_cb(win, (float)yoffset, win->input);
       });
   glfwSetWindowSizeCallback(
@@ -259,10 +287,12 @@ void run_ui(gui_window* win) {
     win->input.mouse_pos = vec2f{(float)mouse_posx, (float)mouse_posy};
     if (win->widgets_width && win->widgets_left)
       win->input.mouse_pos.x -= win->widgets_width;
-    win->input.mouse_left = glfwGetMouseButton(
-                                win->win, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS;
-    win->input.mouse_right =
-        glfwGetMouseButton(win->win, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS;
+    //    win->input.mouse_left = glfwGetMouseButton(
+    //                                win->win, GLFW_MOUSE_BUTTON_LEFT) ==
+    //                                GLFW_PRESS;
+    //    win->input.mouse_right =
+    //        glfwGetMouseButton(win->win, GLFW_MOUSE_BUTTON_RIGHT) ==
+    //        GLFW_PRESS;
     win->input.modifier_alt =
         glfwGetKey(win->win, GLFW_KEY_LEFT_ALT) == GLFW_PRESS ||
         glfwGetKey(win->win, GLFW_KEY_RIGHT_ALT) == GLFW_PRESS;
