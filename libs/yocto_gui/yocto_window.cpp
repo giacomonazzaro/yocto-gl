@@ -428,7 +428,7 @@ void run_ui(gui_window* win, const new_update_callback& update) {
   }
 
   // clear
-  if (win->clear_cb) win->clear_cb(win, win->input);
+  clear_window(win);
 }
 
 void set_init_callback(gui_window* win, init_callback cb) { win->init_cb = cb; }
