@@ -233,46 +233,6 @@ void draw_widgets(app_state* app, const gui_input& input) {
   auto widgets = &app->widgets;
   begin_imgui(widgets, "yshapeview", {0, 0}, {320, 720});
 
-  // static auto load_path = ""s, save_path = ""s, error_message = ""s;
-  // if (draw_filedialog_button(widgets, "load", true, "load", load_path, false,
-  //         "./", "", "*.ply;*.obj")) {
-  //   load_shape(app, load_path);
-  //   load_path = "";
-  // }
-  // continue_line(widgets);
-  // if (draw_filedialog_button(widgets, "save", apps->selected &&
-  // apps->selected->ok,
-  //         "save", save_path, true, path_dirname(save_path),
-  //         path_filename(save_path), "*.ply;*.obj")) {
-  //   auto app     = apps->selected;
-  //   app->outname = save_path;
-  //   save_shape(app->outname, *app->ioshape, app->error);
-  //   save_path = "";
-  // }
-  //  continue_line(widgets);
-  //  if (draw_button(widgets, "close", (bool)apps->selected)) {
-  //    if (apps->selected->loader.valid()) return;
-  //    delete apps->selected;
-  //    apps->states.erase(
-  //        std::find(apps->states.begin(), apps->states.end(),
-  //        apps->selected));
-  //    apps->selected = apps->states.empty() ? nullptr : apps->states.front();
-  //  }
-  //  continue_line(widgets);
-  //  if (draw_button(widgets, "quit")) {
-  //    set_close(widgets, true);
-  //  }
-  //  if (apps->states.empty()) return;
-  //  draw_combobox(widgets, "shape", apps->selected, apps->states, false);
-  //  if (!apps->selected) return;
-  //  draw_progressbar(widgets, apps->selected->status.c_str(),
-  //      apps->selected->current, apps->selected->total);
-  //  if (apps->selected->error != "") {
-  //    draw_label(widgets, "error", apps->selected->error);
-  //    return;
-  //  }
-  //  if (!apps->selected->ok) return;
-  //  auto app = apps->selected;
   if (begin_header(widgets, "view")) {
     auto  glmaterial = app->glscene->materials.front();
     auto& params     = app->drawgl_prms;
@@ -320,43 +280,15 @@ void draw_widgets(app_state* app, const gui_input& input) {
   end_imgui(widgets);
 }
 
-// draw with shading
-void draw(app_state* app, const gui_input& input) {
+// draw with shape
+void draw_scene(app_state* app, const gui_input& input) {
   draw_scene(app->glscene, app->glcamera, input.framebuffer_viewport,
       app->drawgl_prms);
 }
 
-// update
-void update(app_state* app) {
-  //  auto is_ready = [](const std::future<void>& result) -> bool {
-  //    return result.valid() && result.wait_for(std::chrono::microseconds(0))
-  //    ==
-  //                                 std::future_status::ready;
-  //  };
-  //
-  //  while (!apps->loading.empty()) {
-  //    auto app = apps->loading.front();
-  //    if (!is_ready(app->loader)) break;
-  //    apps->loading.pop_front();
-  //    auto progress_cb = [app](const string& message, int current, int total)
-  //    {
-  //      app->current = current;
-  //      app->total   = total;
-  //    };
-  //    app->loader.get();
-  //    if (app->loader_error.empty()) {
-  //      init_glscene(app, app->glscene, app->ioshape, progress_cb);
-  //      app->glcamera = app->glscene->cameras.front();
-  //      app->ok       = true;
-  //      app->status   = "ok";
-  //    } else {
-  //      app->status = "error";
-  //      app->error  = app->loader_error;
-  //    }
-  //  }
-}
-
 void update_camera(app_state* app, const gui_input& input) {
+  if (is_active(&app->widgets)) return;
+
   // handle mouse and keyboard for navigation
   if ((input.mouse_left || input.mouse_right) && !input.modifier_alt &&
       !input.widgets_active) {
@@ -377,13 +309,7 @@ void update_camera(app_state* app, const gui_input& input) {
   }
 };
 
-void update_app(const gui_input& input, void* data) {
-  auto app = (app_state*)data;
-
-  if (!is_active(&app->widgets)) {
-    update_camera(app, input);
-  }
-
+void drop(app_state* app, const gui_input& input) {
   if (input.dropped.size()) {
     load_shape(app, input.dropped[0]);
     clear_scene(app->glscene);
@@ -391,15 +317,19 @@ void update_app(const gui_input& input, void* data) {
     app->glcamera = app->glscene->cameras.front();
     return;
   }
+}
 
-  draw(app, input);
+void update_app(const gui_input& input, void* data) {
+  auto app = (app_state*)data;
+
+  update_camera(app, input);
+  drop(app, input);
+
+  draw_scene(app, input);
   draw_widgets(app, input);
 }
 
 int main(int argc, const char* argv[]) {
-  // initialize app
-  // auto apps_guard  = std::make_unique<app_states>();
-  // auto apps        = apps_guard.get();
   auto app         = new app_state{};
   auto filename    = "tests/_data/shapes/bunny.obj"s;
   auto camera_name = ""s;
