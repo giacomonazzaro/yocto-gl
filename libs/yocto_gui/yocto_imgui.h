@@ -57,7 +57,10 @@ using std::vector;
 namespace yocto {
 
 struct gui_window;
-struct gui_widgets {};
+
+struct gui_widgets {
+  gui_window* window = nullptr;
+};
 
 gui_widgets create_imgui(gui_window* win);
 

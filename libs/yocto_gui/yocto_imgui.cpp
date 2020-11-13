@@ -77,19 +77,22 @@ using namespace std::string_literals;
 // -----------------------------------------------------------------------------
 namespace yocto {
 
-gui_widgets create_imgui(gui_window* win) {
+gui_widgets create_imgui(gui_window* window) {
   // widgets
   ImGui::CreateContext();
   ImGui::GetIO().IniFilename       = nullptr;
   ImGui::GetStyle().WindowRounding = 0;
-  ImGui_ImplGlfw_InitForOpenGL(win->win, true);
+  ImGui_ImplGlfw_InitForOpenGL(window->win, true);
 #ifndef __APPLE__
   ImGui_ImplOpenGL3_Init();
 #else
   ImGui_ImplOpenGL3_Init("#version 330");
 #endif
   ImGui::StyleColorsDark();
-  return gui_widgets{};
+
+  auto widgets   = gui_widgets{};
+  widgets.window = window;
+  return widgets;
 }
 
 bool begin_imgui(gui_widgets* widgets, const string& name,
