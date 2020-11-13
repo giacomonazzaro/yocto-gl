@@ -296,6 +296,7 @@ int main(int argc, const char* argv[]) {
   app->widgets  = create_imgui(window);
 
   run_ui(window, update_app);
+  clear_scene(app->glscene);
 
   // done
   return 0;
