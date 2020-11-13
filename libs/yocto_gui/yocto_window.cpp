@@ -58,7 +58,7 @@ namespace yocto {
 
 inline void update_button_from_input(gui_button& button, bool pressing) {
   if (pressing) {
-    //    assert(button.state != gui_button::state::down);
+    assert(button.state != gui_button::state::down);
     button.state = gui_button::state::pressing;
   } else {
     button.state = gui_button::state::releasing;
@@ -75,9 +75,16 @@ inline void update_button_for_next_frame(gui_button& button) {
 
 void init_window(gui_window* win, const vec2i& size, const string& title,
     bool widgets, int widgets_width, bool widgets_left) {
+  // set error callback
+  glfwSetErrorCallback([](int code, const char* description) {
+    printf("glfw error code: %d\n", code);
+    printf("glfw error description: %s\n", description);
+  });
+
   // init glfw
   if (!glfwInit())
     throw std::runtime_error("cannot initialize windowing system");
+
   glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
   glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
   glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
@@ -170,6 +177,19 @@ void clear_window(gui_window* win) {
   win->win = nullptr;
 }
 
+// TODO(giacomo): rename
+static void update_input_next_frame(gui_input& input) {
+  // Clear/init input for next frame.
+  update_button_for_next_frame(input.mouse_left);
+  update_button_for_next_frame(input.mouse_right);
+  for (auto& key : input.key_buttons) {
+    update_button_for_next_frame(key);
+  }
+  input.scroll     = zero2f;
+  input.mouse_last = input.mouse_pos;
+  input.dropped.clear();
+}
+
 static void update_input(gui_input& input, const gui_window* win) {
   input.mouse_last = input.mouse_pos;
   auto mouse_posx = 0.0, mouse_posy = 0.0;
@@ -200,13 +220,6 @@ static void update_input(gui_input& input, const gui_window* win) {
     input.framebuffer_viewport.z -= offset;
     if (win->widgets_left) input.framebuffer_viewport.x += offset;
   }
-  if (win->widgets_width) {
-    // TODO(giacomo): restore this
-    // auto io                   = &ImGui::GetIO();
-    // input.widgets_active = io->WantTextInput || io->WantCaptureMouse
-    // ||
-    //                             io->WantCaptureKeyboard;
-  }
 
   // time
   input.clock_last = input.clock_now;
@@ -217,22 +230,13 @@ static void update_input(gui_input& input, const gui_window* win) {
                      1000000000.0;
 }
 
-static void update_input_next_frame(gui_input& input) {
-  // Clear/init input for next frame.
-  update_button_for_next_frame(input.mouse_left);
-  update_button_for_next_frame(input.mouse_right);
-  for (auto& key : input.key_buttons) {
-    update_button_for_next_frame(key);
-  }
-  input.scroll     = zero2f;
-  input.mouse_last = input.mouse_pos;
-  input.dropped.clear();
-}
-
 void run_ui(gui_window* win, update_callback update) {
   // loop
   while (!glfwWindowShouldClose(win->win)) {
     // update input
+    // TODO(giacomo): merge these calls
+    update_input_next_frame(win->input);
+    glfwPollEvents();
     update_input(win->input, win);
 
     glClearColor(win->background.x, win->background.y, win->background.z,
@@ -243,12 +247,6 @@ void run_ui(gui_window* win, update_callback update) {
     update(win->input, win->user_data);
 
     glfwSwapBuffers(win->win);
-
-    // TODO(giacomo): solve this...
-    update_input_next_frame(win->input);
-
-    // event handling
-    glfwPollEvents();
   }
 
   // clear
