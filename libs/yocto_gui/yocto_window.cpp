@@ -58,7 +58,7 @@ namespace yocto {
 
 inline void update_button_from_input(gui_button& button, bool pressing) {
   if (pressing) {
-    // TODO(giacomo): solve this assert 
+    // TODO(giacomo): solve this assert
     assert(button.state != gui_button::state::down);
     button.state = gui_button::state::pressing;
   } else {
@@ -162,7 +162,7 @@ void init_window(gui_window* win, const vec2i& size, const string& title,
   if (!gladLoadGL())
     throw std::runtime_error{"cannot initialize OpenGL extensions"};
 
-  // TODO(giacomo): ???
+  // TODO(giacomo): eventually remove this stuff
   win->widgets       = true;
   win->widgets_width = widgets_width;
   win->widgets_left  = widgets_left;
@@ -174,9 +174,8 @@ void clear_window(gui_window* win) {
   win->win = nullptr;
 }
 
-// TODO(giacomo): rename
-static void update_input_next_frame(gui_input& input) {
-  // Clear/init input for next frame.
+static void poll_input(gui_input& input, const gui_window* win) {
+  // Clear input for next frame.
   update_button_for_next_frame(input.mouse_left);
   update_button_for_next_frame(input.mouse_right);
   for (auto& key : input.key_buttons) {
@@ -185,9 +184,10 @@ static void update_input_next_frame(gui_input& input) {
   input.scroll     = zero2f;
   input.mouse_last = input.mouse_pos;
   input.dropped.clear();
-}
 
-static void update_input(gui_input& input, const gui_window* win) {
+  // Poll new inputs
+  glfwPollEvents();
+
   input.mouse_last = input.mouse_pos;
   auto mouse_posx = 0.0, mouse_posy = 0.0;
   glfwGetCursorPos(win->win, &mouse_posx, &mouse_posy);
@@ -230,12 +230,10 @@ static void update_input(gui_input& input, const gui_window* win) {
 void run_ui(gui_window* win, update_callback update) {
   // loop
   while (!glfwWindowShouldClose(win->win)) {
-    // update input
-    // TODO(giacomo): merge these calls
-    update_input_next_frame(win->input);
-    glfwPollEvents();
-    update_input(win->input, win);
+    // poll input
+    poll_input(win->input, win);
 
+    // clear framebuffer
     glClearColor(win->background.x, win->background.y, win->background.z,
         win->background.w);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
