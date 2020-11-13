@@ -62,7 +62,7 @@ struct gui_widgets {};
 gui_widgets create_imgui(gui_window* win);
 
 bool begin_imgui(gui_widgets* widgets, const string& name,
-    const vec2i& position, const vec2i& size);
+    const vec2i& position = {0, 0}, const vec2i& size = {320, 720});
 void end_imgui(gui_widgets* widgets);
 
 bool is_active(gui_widgets* widgets);

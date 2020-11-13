@@ -130,10 +130,6 @@ void init_window(gui_window* win, const vec2i& size, const string& title,
         } else if (button == GLFW_MOUSE_BUTTON_MIDDLE) {
           update_button_from_input(win->input.mouse_middle, press);
         }
-        // if (win->click_cb)
-        //   win->click_cb(
-        //       win, button == GLFW_MOUSE_BUTTON_LEFT, (bool)action,
-        //       win->input);
       });
   glfwSetScrollCallback(
       win->win, [](GLFWwindow* glfw, double xoffset, double yoffset) {
