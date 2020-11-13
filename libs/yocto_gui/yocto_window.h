@@ -165,8 +165,6 @@ struct gui_input {
   vec2i window_size          = {0, 0};
   vec4i framebuffer_viewport = {0, 0, 0, 0};
   vec2i framebuffer_size     = {0, 0};
-  // bool  is_window_focused    = false;  // window is focused
-  // bool widgets_active = false;
 
   std::vector<std::string>    dropped     = {};
   std::array<gui_button, 512> key_buttons = {};
