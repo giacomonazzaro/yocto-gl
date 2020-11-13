@@ -33,7 +33,6 @@
 #include <yocto/yocto_math.h>
 
 #include <array>
-#include <functional>
 #include <string>
 #include <vector>
 
@@ -44,7 +43,6 @@ namespace yocto {
 
 // using directives
 using std::array;
-using std::function;
 using std::string;
 using std::vector;
 
@@ -179,57 +177,9 @@ struct gui_input {
   bool  is_window_focused    = false;  // window is focused
   bool  widgets_active       = false;
 
+  std::vector<string>         dropped     = {};
   std::array<gui_button, 512> key_buttons = {};
 };
-
-// Init callback called after the window has opened
-using init_callback = function<void(gui_window*, const gui_input& input)>;
-// Clear callback called after the window is cloased
-using clear_callback = function<void(gui_window*, const gui_input& input)>;
-// Draw callback called every frame and when resizing
-using draw_callback = function<void(gui_window*, const gui_input& input)>;
-// Draw callback for drawing widgets
-using widgets_callback = function<void(gui_window*, const gui_input& input)>;
-// Drop callback that returns that list of dropped strings.
-using drop_callback =
-    function<void(gui_window*, const vector<string>&, const gui_input& input)>;
-// Key callback that returns key codes, pressed/released flag and modifier keys
-using key_callback =
-    function<void(gui_window*, int key, bool pressed, const gui_input& input)>;
-// Char callback that returns ASCII key
-using char_callback =
-    function<void(gui_window*, unsigned int key, const gui_input& input)>;
-// Mouse click callback that returns left/right button, pressed/released flag,
-// modifier keys
-using click_callback = function<void(
-    gui_window*, bool left, bool pressed, const gui_input& input)>;
-// Scroll callback that returns scroll amount
-using scroll_callback =
-    function<void(gui_window*, float amount, const gui_input& input)>;
-// Update functions called every frame
-using uiupdate_callback = function<void(gui_window*, const gui_input& input)>;
-// Update functions called every frame
-using update_callback = function<void(gui_window*, const gui_input& input)>;
-
-// User interface callcaks
-struct gui_callbacks {
-  init_callback     init_cb     = {};
-  clear_callback    clear_cb    = {};
-  draw_callback     draw_cb     = {};
-  widgets_callback  widgets_cb  = {};
-  drop_callback     drop_cb     = {};
-  key_callback      key_cb      = {};
-  char_callback     char_cb     = {};
-  click_callback    click_cb    = {};
-  scroll_callback   scroll_cb   = {};
-  update_callback   update_cb   = {};
-  uiupdate_callback uiupdate_cb = {};
-};
-
-// run the user interface with the give callbacks
-void run_ui(const vec2i& size, const string& title,
-    const gui_callbacks& callbaks, int widgets_width = 320,
-    bool widgets_left = true);
 
 }  // namespace yocto
 
@@ -249,19 +199,6 @@ struct gui_window {
   gui_input   input                   = {};
   vec4f       background              = {0.15f, 0.15f, 0.15f, 1.0f};
   void*       user_data               = nullptr;
-
-  // callbacks
-  init_callback     init_cb     = {};
-  clear_callback    clear_cb    = {};
-  draw_callback     draw_cb     = {};
-  widgets_callback  widgets_cb  = {};
-  drop_callback     drop_cb     = {};
-  key_callback      key_cb      = {};
-  char_callback     char_cb     = {};
-  click_callback    click_cb    = {};
-  scroll_callback   scroll_cb   = {};
-  update_callback   update_cb   = {};
-  uiupdate_callback uiupdate_cb = {};
 };
 
 // Windows initialization
@@ -271,27 +208,16 @@ void init_window(gui_window* win, const vec2i& size, const string& title,
 // Window cleanup
 void clear_window(gui_window* win);
 
-// Set callbacks
-void set_init_callback(gui_window* win, init_callback init_cb);
-void set_clear_callback(gui_window* win, clear_callback clear_cb);
-void set_draw_callback(gui_window* win, draw_callback draw_cb);
-void set_widgets_callback(gui_window* win, widgets_callback widgets_cb);
-void set_drop_callback(gui_window* win, drop_callback drop_cb);
-void set_key_callback(gui_window* win, key_callback cb);
-void set_char_callback(gui_window* win, char_callback cb);
-void set_click_callback(gui_window* win, click_callback cb);
-void set_scroll_callback(gui_window* win, scroll_callback cb);
-void set_uiupdate_callback(gui_window* win, uiupdate_callback cb);
-void set_update_callback(gui_window* win, update_callback cb);
-
 // Run loop
 void run_ui(gui_window* win);
 
 // TODO(giacomo): try to move to function pointers, ditching std::function
 // typedef void (*update_callback)(const gui_input&, void*));
-using new_update_callback = std::function<void(const gui_input&, void* user)>;
+using new_update_callback =
+    std::function<void(const gui_input&, void* user_data)>;
 
 void run_ui(gui_window* win, const new_update_callback& update);
+
 void set_close(gui_window* win, bool close);
 
 }  // namespace yocto

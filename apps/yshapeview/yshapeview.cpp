@@ -83,22 +83,6 @@ struct app_state {
   }
 };
 
-// Application state
-// struct app_states {
-//   // data
-//   vector<app_state*>     states   = {};
-//   app_state*             selected = nullptr;
-//   std::deque<app_state*> loading  = {};
-
-//   // default options
-//   shade_params drawgl_prms = {};
-
-//   // cleanup
-//   ~app_states() {
-//     for (auto state : states) delete state;
-//   }
-// };
-
 void load_shape(app_state* app, const string& filename) {
   app->filename  = filename;
   app->imagename = replace_extension(filename, ".png");
@@ -397,7 +381,15 @@ void update_app(const gui_input& input, void* data) {
   auto app = (app_state*)data;
 
   ui_update(app, input);
-  update(app);
+
+  if (input.dropped.size()) {
+    load_shape(app, input.dropped[0]);
+    clear_scene(app->glscene);
+    init_glscene(app, app->glscene, app->ioshape, {});
+    app->glcamera = app->glscene->cameras.front();
+    return;
+  }
+
   draw(app, input);
   draw_widgets(app, input);
   // draw_widgets(win, apps, input);
@@ -422,8 +414,7 @@ int main(int argc, const char* argv[]) {
   parse_cli(cli, argc, argv);
 
   auto window = new gui_window{};
-  init_window(
-      window, {1280 + 320, 720}, "yshapeview", true);
+  init_window(window, {1280 + 320, 720}, "yshapeview", true);
   window->user_data = app;
 
   load_shape(app, filename);

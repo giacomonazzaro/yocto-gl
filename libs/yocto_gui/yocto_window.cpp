@@ -68,40 +68,6 @@ using namespace std::string_literals;
 }  // namespace yocto
 
 // -----------------------------------------------------------------------------
-// UI APPLICATION
-// -----------------------------------------------------------------------------
-namespace yocto {
-
-// run the user interface with the give callbacks
-void run_ui(const vec2i& size, const string& title,
-    const gui_callbacks& callbacks, int widgets_width, bool widgets_left) {
-  auto win_guard = std::make_unique<gui_window>();
-  auto win       = win_guard.get();
-  init_window(win, size, title, (bool)callbacks.widgets_cb, widgets_width,
-      widgets_left);
-
-  set_init_callback(win, callbacks.init_cb);
-  set_clear_callback(win, callbacks.clear_cb);
-  set_draw_callback(win, callbacks.draw_cb);
-  set_widgets_callback(win, callbacks.widgets_cb);
-  set_drop_callback(win, callbacks.drop_cb);
-  set_key_callback(win, callbacks.key_cb);
-  set_char_callback(win, callbacks.char_cb);
-  set_click_callback(win, callbacks.click_cb);
-  set_scroll_callback(win, callbacks.scroll_cb);
-  set_update_callback(win, callbacks.update_cb);
-  set_uiupdate_callback(win, callbacks.uiupdate_cb);
-
-  // run ui
-  run_ui(win);
-
-  // clear
-  clear_window(win);
-}
-
-}  // namespace yocto
-
-// -----------------------------------------------------------------------------
 // UI WINDOW
 // -----------------------------------------------------------------------------
 namespace yocto {
@@ -121,26 +87,6 @@ inline void update_button_for_next_frame(gui_button& button) {
   } else if (button.state == gui_button::state::releasing) {
     button.state = gui_button::state::up;
   }
-}
-
-// // TODO(giacomo): forward declarations, this is dirty...
-// bool begin_imgui(gui_window* win);
-// void end_imgui(gui_window* win);
-
-static void draw_window(gui_window* win) {
-  glClearColor(win->background.x, win->background.y, win->background.z,
-      win->background.w);
-  glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-  if (win->draw_cb) win->draw_cb(win, win->input);
-
-  // if (win->widgets_cb) {
-  //   if (begin_imgui(win)) {
-  //     win->widgets_cb(win, win->input);
-  //     end_imgui(win);
-  //   }
-  // }
-
-  glfwSwapBuffers(win->win);
 }
 
 void init_window(gui_window* win, const vec2i& size, const string& title,
@@ -166,31 +112,21 @@ void init_window(gui_window* win, const vec2i& size, const string& title,
   // set user data
   glfwSetWindowUserPointer(win->win, win);
 
-  // set callbacks
-  glfwSetWindowRefreshCallback(win->win, [](GLFWwindow* glfw) {
-    auto win = (gui_window*)glfwGetWindowUserPointer(glfw);
-    draw_window(win);
-  });
   glfwSetDropCallback(
       win->win, [](GLFWwindow* glfw, int num, const char** paths) {
         auto win = (gui_window*)glfwGetWindowUserPointer(glfw);
-        if (win->drop_cb) {
-          auto pathv = vector<string>();
-          for (auto i = 0; i < num; i++) pathv.push_back(paths[i]);
-          win->drop_cb(win, pathv, win->input);
-        }
+        win->input.dropped.resize(num);
+        for (auto i = 0; i < num; i++) win->input.dropped[i] = string(paths[i]);
       });
   glfwSetKeyCallback(win->win,
       [](GLFWwindow* glfw, int key, int scancode, int action, int mods) {
         auto win   = (gui_window*)glfwGetWindowUserPointer(glfw);
         auto press = (action == GLFW_PRESS);
         update_button_from_input(win->input.key_buttons[key], press);
-        if (win->key_cb) win->key_cb(win, key, (bool)action, win->input);
       });
   glfwSetCharCallback(win->win, [](GLFWwindow* glfw, unsigned int key) {
     auto win = (gui_window*)glfwGetWindowUserPointer(glfw);
     update_button_from_input(win->input.key_buttons[key], true);
-    // if (win->char_cb) win->char_cb(win, key, win->input);
   });
   glfwSetMouseButtonCallback(
       win->win, [](GLFWwindow* glfw, int button, int action, int mods) {
@@ -212,7 +148,6 @@ void init_window(gui_window* win, const vec2i& size, const string& title,
       win->win, [](GLFWwindow* glfw, double xoffset, double yoffset) {
         auto win          = (gui_window*)glfwGetWindowUserPointer(glfw);
         win->input.scroll = {(float)xoffset, (float)yoffset};
-        if (win->scroll_cb) win->scroll_cb(win, (float)yoffset, win->input);
       });
   glfwSetWindowSizeCallback(
       win->win, [](GLFWwindow* glfw, int width, int height) {
@@ -327,75 +262,7 @@ static void update_input_next_frame(gui_input& input) {
   }
   input.scroll     = zero2f;
   input.mouse_last = input.mouse_pos;
-}
-
-// TODO(giacomo): This will eventually disappear (when everything is poll-based)
-void run_callbacks(gui_window* win) {
-  // key input
-  if (win->char_cb) {
-    for (auto i = 0; i < win->input.key_buttons.size(); i++) {
-      if (win->input.key_buttons[i].state == gui_button::state::pressing) {
-        win->char_cb(win, i, win->input);
-      }
-    }
-  }
-
-  // mouse click
-  if (win->click_cb) {
-    {
-      auto pressing =
-          (win->input.mouse_left.state == gui_button::state::pressing);
-      auto releasing =
-          (win->input.mouse_left.state == gui_button::state::releasing);
-      if (pressing || releasing) {
-        win->click_cb(win, true, pressing, win->input);
-      }
-    }
-
-    {
-      auto pressing =
-          (win->input.mouse_right.state == gui_button::state::pressing);
-      auto releasing =
-          (win->input.mouse_right.state == gui_button::state::releasing);
-      if (pressing || releasing) {
-        win->click_cb(win, false, pressing, win->input);
-      }
-    }
-  }
-
-  // update ui
-  if (win->uiupdate_cb && !win->input.widgets_active)
-    win->uiupdate_cb(win, win->input);
-
-  // update
-  if (win->update_cb) win->update_cb(win, win->input);
-}
-
-// Run loop
-void run_ui(gui_window* win) {
-  // init
-  if (win->init_cb) win->init_cb(win, win->input);
-
-  // loop
-  while (!glfwWindowShouldClose(win->win)) {
-    // update input
-    update_input(win->input, win);
-
-    // TODO(giacomo): deprecate callbacks at some point.
-    // run callbacks
-    run_callbacks(win);
-
-    // draw
-    draw_window(win);
-
-    update_input_next_frame(win->input);
-
-    // event handling
-    glfwPollEvents();
-  }
-
-  // clear
-  if (win->clear_cb) win->clear_cb(win, win->input);
+  input.dropped.clear();
 }
 
 void run_ui(gui_window* win, const new_update_callback& update) {
@@ -422,32 +289,6 @@ void run_ui(gui_window* win, const new_update_callback& update) {
 
   // clear
   clear_window(win);
-}
-
-void set_init_callback(gui_window* win, init_callback cb) { win->init_cb = cb; }
-void set_clear_callback(gui_window* win, clear_callback cb) {
-  win->clear_cb = cb;
-}
-void set_draw_callback(gui_window* win, draw_callback cb) { win->draw_cb = cb; }
-void set_widgets_callback(gui_window* win, widgets_callback cb) {
-  win->widgets_cb = cb;
-}
-void set_drop_callback(gui_window* win, drop_callback drop_cb) {
-  win->drop_cb = drop_cb;
-}
-void set_key_callback(gui_window* win, key_callback cb) { win->key_cb = cb; }
-void set_char_callback(gui_window* win, char_callback cb) { win->char_cb = cb; }
-void set_click_callback(gui_window* win, click_callback cb) {
-  win->click_cb = cb;
-}
-void set_scroll_callback(gui_window* win, scroll_callback cb) {
-  win->scroll_cb = cb;
-}
-void set_uiupdate_callback(gui_window* win, uiupdate_callback cb) {
-  win->uiupdate_cb = cb;
-}
-void set_update_callback(gui_window* win, update_callback cb) {
-  win->update_cb = cb;
 }
 
 void set_close(gui_window* win, bool close) {
