@@ -189,6 +189,8 @@ int main(int argc, const char* argv[]) {
 
   // run ui
   run_ui(window, update_app);
+
+  // clear
   clear_image(app->glimage);
 
   // done
