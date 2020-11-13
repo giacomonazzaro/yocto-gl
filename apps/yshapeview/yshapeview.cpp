@@ -356,7 +356,7 @@ void update(app_state* app) {
   //  }
 }
 
-void ui_update(app_state* app, const gui_input& input) {
+void update_camera(app_state* app, const gui_input& input) {
   // handle mouse and keyboard for navigation
   if ((input.mouse_left || input.mouse_right) && !input.modifier_alt &&
       !input.widgets_active) {
@@ -380,7 +380,9 @@ void ui_update(app_state* app, const gui_input& input) {
 void update_app(const gui_input& input, void* data) {
   auto app = (app_state*)data;
 
-  ui_update(app, input);
+  if (!is_active(&app->widgets)) {
+    update_camera(app, input);
+  }
 
   if (input.dropped.size()) {
     load_shape(app, input.dropped[0]);
@@ -392,7 +394,6 @@ void update_app(const gui_input& input, void* data) {
 
   draw(app, input);
   draw_widgets(app, input);
-  // draw_widgets(win, apps, input);
 }
 
 int main(int argc, const char* argv[]) {

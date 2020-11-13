@@ -51,7 +51,7 @@
 #include "ext/imgui/imgui_impl_glfw.h"
 #include "ext/imgui/imgui_impl_opengl3.h"
 #include "ext/imgui/imgui_internal.h"
-#include "yocto_window.h";
+#include "yocto_window.h"
 
 #ifdef _WIN32
 #undef near
@@ -127,6 +127,11 @@ void end_imgui(gui_widgets* widgets) {
   ImGui::End();
   ImGui::Render();
   ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+}
+
+bool is_active(gui_widgets* widgets) {
+  auto io = &ImGui::GetIO();
+  return io->WantTextInput || io->WantCaptureMouse || io->WantCaptureKeyboard;
 }
 
 bool begin_header(gui_widgets* widgets, const char* lbl) {

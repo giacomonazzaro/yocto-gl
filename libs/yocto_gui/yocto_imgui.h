@@ -65,6 +65,8 @@ bool begin_imgui(gui_widgets* widgets, const string& name,
     const vec2i& position, const vec2i& size);
 void end_imgui(gui_widgets* widgets);
 
+bool is_active(gui_widgets* widgets);
+
 bool begin_header(gui_widgets* widgets, const char* title);
 void end_header(gui_widgets* widgets);
 

@@ -39,14 +39,6 @@
 // -----------------------------------------------------------------------------
 // USING DIRECTIVES
 // -----------------------------------------------------------------------------
-namespace yocto {
-
-// using directives
-using std::array;
-using std::string;
-using std::vector;
-
-}  // namespace yocto
 
 // forward declaration
 struct GLFWwindow;
@@ -177,7 +169,7 @@ struct gui_input {
   bool  is_window_focused    = false;  // window is focused
   bool  widgets_active       = false;
 
-  std::vector<string>         dropped     = {};
+  std::vector<std::string>    dropped     = {};
   std::array<gui_button, 512> key_buttons = {};
 };
 
@@ -190,33 +182,28 @@ namespace yocto {
 
 // OpenGL window wrapper
 struct gui_window {
-  GLFWwindow* win                     = nullptr;
-  string      title                   = "";
-  bool        widgets                 = false;
-  bool        widgets_are_initialized = false;
-  int         widgets_width           = 0;
-  bool        widgets_left            = true;
-  gui_input   input                   = {};
-  vec4f       background              = {0.15f, 0.15f, 0.15f, 1.0f};
-  void*       user_data               = nullptr;
+  GLFWwindow* win           = nullptr;
+  std::string title         = "";
+  bool        widgets       = false;
+  int         widgets_width = 0;
+  bool        widgets_left  = true;
+  gui_input   input         = {};
+  vec4f       background    = {0.15f, 0.15f, 0.15f, 1.0f};
+  void*       user_data     = nullptr;
 };
 
 // Windows initialization
-void init_window(gui_window* win, const vec2i& size, const string& title,
+void init_window(gui_window* win, const vec2i& size, const std::string& title,
     bool widgets, int widgets_width = 320, bool widgets_left = true);
 
 // Window cleanup
 void clear_window(gui_window* win);
 
+// Callback
+typedef void (*update_callback)(const gui_input&, void*);
+
 // Run loop
-void run_ui(gui_window* win);
-
-// TODO(giacomo): try to move to function pointers, ditching std::function
-// typedef void (*update_callback)(const gui_input&, void*));
-using new_update_callback =
-    std::function<void(const gui_input&, void* user_data)>;
-
-void run_ui(gui_window* win, const new_update_callback& update);
+void run_ui(gui_window* win, update_callback update);
 
 void set_close(gui_window* win, bool close);
 

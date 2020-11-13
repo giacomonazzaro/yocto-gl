@@ -32,14 +32,8 @@
 
 #include <yocto/yocto_commonio.h>
 
-#include <algorithm>
 #include <array>
-#include <cstdarg>
-#include <memory>
-#include <mutex>
-#include <stdexcept>
-#include <unordered_map>
-#include <utility>
+#include <chrono>
 
 #include "ext/glad/glad.h"
 
@@ -56,16 +50,6 @@
 // -----------------------------------------------------------------------------
 // USING DIRECTIVES
 // -----------------------------------------------------------------------------
-namespace yocto {
-
-// using directives
-using std::array;
-using std::mutex;
-using std::pair;
-using std::unordered_map;
-using namespace std::string_literals;
-
-}  // namespace yocto
 
 // -----------------------------------------------------------------------------
 // UI WINDOW
@@ -178,21 +162,6 @@ void init_window(gui_window* win, const vec2i& size, const string& title,
   win->widgets       = true;
   win->widgets_width = widgets_width;
   win->widgets_left  = widgets_left;
-  // widgets
-  //   if (widgets) {
-  //     ImGui::CreateContext();
-  //     ImGui::GetIO().IniFilename       = nullptr;
-  //     ImGui::GetStyle().WindowRounding = 0;
-  //     ImGui_ImplGlfw_InitForOpenGL(win->win, true);
-  // #ifndef __APPLE__
-  //     ImGui_ImplOpenGL3_Init();
-  // #else
-  //     ImGui_ImplOpenGL3_Init("#version 330");
-  // #endif
-  //     ImGui::StyleColorsDark();
-  //     win->widgets_width = widgets_width;
-  //     win->widgets_left  = widgets_left;
-  //   }
 }
 
 void clear_window(gui_window* win) {
@@ -206,14 +175,9 @@ static void update_input(gui_input& input, const gui_window* win) {
   auto mouse_posx = 0.0, mouse_posy = 0.0;
   glfwGetCursorPos(win->win, &mouse_posx, &mouse_posy);
   input.mouse_pos = vec2f{(float)mouse_posx, (float)mouse_posy};
-  if (win->widgets_width && win->widgets_left)
+  if (win->widgets_width && win->widgets_left) {
     input.mouse_pos.x -= win->widgets_width;
-  //    input.mouse_left = glfwGetMouseButton(
-  //                                win->win, GLFW_MOUSE_BUTTON_LEFT) ==
-  //                                GLFW_PRESS;
-  //    input.mouse_right =
-  //        glfwGetMouseButton(win->win, GLFW_MOUSE_BUTTON_RIGHT) ==
-  //        GLFW_PRESS;
+  }
   input.modifier_alt = glfwGetKey(win->win, GLFW_KEY_LEFT_ALT) == GLFW_PRESS ||
                        glfwGetKey(win->win, GLFW_KEY_RIGHT_ALT) == GLFW_PRESS;
   input.modifier_shift =
@@ -265,7 +229,7 @@ static void update_input_next_frame(gui_input& input) {
   input.dropped.clear();
 }
 
-void run_ui(gui_window* win, const new_update_callback& update) {
+void run_ui(gui_window* win, update_callback update) {
   // loop
   while (!glfwWindowShouldClose(win->win)) {
     // update input
