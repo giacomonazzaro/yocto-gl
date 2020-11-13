@@ -634,8 +634,7 @@ void update_camera(app_states* apps, const gui_input& input) {
   auto app = apps->selected;
 
   // handle mouse and keyboard for navigation
-  if ((input.mouse_left || input.mouse_right) && !input.modifier_alt &&
-      !input.widgets_active) {
+  if ((input.mouse_left || input.mouse_right) && !input.modifier_alt) {
     auto dolly  = 0.0f;
     auto pan    = zero2f;
     auto rotate = zero2f;

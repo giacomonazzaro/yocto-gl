@@ -238,7 +238,7 @@ void init_scene(trace_scene* scene, sceneio_scene* ioscene,
   camera = camera_map.at(iocamera);
 }
 
-void draw(const gui_input& input, app_state* app) {
+void draw_scene(app_state* app, const gui_input& input) {
   if (!is_initialized(app->glimage)) init_image(app->glimage);
   if (!app->render_counter) set_image(app->glimage, app->display, false, false);
   app->glparams.window      = input.window_size;
@@ -251,7 +251,8 @@ void draw(const gui_input& input, app_state* app) {
   if (app->render_counter > 10) app->render_counter = 0;
 }
 
-void widgets(gui_widgets* widgets, app_state* app) {
+void draw_widgets(app_state* app, const gui_input& input) {
+  auto widgets = &app->widgets;
   begin_imgui(widgets, "ysceneitraces");
   auto  edited  = 0;
   auto& tparams = app->params;
@@ -275,7 +276,7 @@ void widgets(gui_widgets* widgets, app_state* app) {
   end_imgui(widgets);
 }
 
-void key_input(const gui_input& input, app_state* app) {
+void key_input(app_state* app, const gui_input& input) {
   for (auto& gkey : input.key_buttons) {
     if (gkey.state != gui_button::state::pressing) continue;
     auto key = (unsigned int)gkey;
@@ -309,9 +310,9 @@ void key_input(const gui_input& input, app_state* app) {
   }
 }
 
-void mouse_input(const gui_input& input, app_state* app) {
-  if ((input.mouse_left || input.mouse_right) && !input.modifier_alt &&
-      !input.widgets_active) {
+void mouse_input(app_state* app, const gui_input& input) {
+  if (is_active(&app->widgets)) return;
+  if ((input.mouse_left || input.mouse_right) && !input.modifier_alt) {
     auto dolly  = 0.0f;
     auto pan    = zero2f;
     auto rotate = zero2f;
@@ -326,6 +327,14 @@ void mouse_input(const gui_input& input, app_state* app) {
         app->camera->frame, app->camera->focus, rotate, dolly, pan);
     reset_display(app);
   }
+}
+
+void update_app(const gui_input& input, void* user_data) {
+  auto app = (app_state*)user_data;
+  mouse_input(app, input);
+  key_input(app, input);
+  draw_scene(app, input);
+  draw_widgets(app, input);
 }
 
 int main(int argc, const char* argv[]) {
@@ -406,13 +415,6 @@ int main(int argc, const char* argv[]) {
   window->user_data = app;
   app->widgets      = create_imgui(window);
 
-  auto update_app = [](const gui_input& input, void* user_data) {
-    auto app = (app_state*)user_data;
-    mouse_input(input, app);
-    key_input(input, app);
-    draw(input, app);
-    widgets(&app->widgets, app);
-  };
   run_ui(window, update_app);
 
   clear_image(app->glimage);

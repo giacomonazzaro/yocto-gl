@@ -735,7 +735,7 @@ void draw_widgets(app_states* apps, const gui_input& input) {
   end_imgui(widgets);
 }
 
-void draw(app_states* apps, const gui_input& input) {
+void draw_scene(app_states* apps, const gui_input& input) {
   if (!apps->selected || !apps->selected->ok) return;
   auto app                  = apps->selected;
   app->glparams.window      = input.window_size;
@@ -784,15 +784,14 @@ void drop(app_states* apps, const gui_input& input) {
   }
 }
 
-void update_camera(const gui_input& input, app_states* apps) {
+void update_camera(app_states* apps, const gui_input& input) {
   if (is_active(&apps->widgets)) return;
 
   if (!apps->selected) return;
   auto app = apps->selected;
 
   // handle mouse and keyboard for navigation
-  if ((input.mouse_left || input.mouse_right) && !input.modifier_alt &&
-      !input.widgets_active) {
+  if ((input.mouse_left || input.mouse_right) && !input.modifier_alt) {
     auto dolly  = 0.0f;
     auto pan    = zero2f;
     auto rotate = zero2f;
@@ -813,8 +812,7 @@ void update_camera(const gui_input& input, app_states* apps) {
   }
 
   // selection
-  if ((input.mouse_left || input.mouse_right) && input.modifier_alt &&
-      !input.widgets_active) {
+  if ((input.mouse_left || input.mouse_right) && input.modifier_alt) {
     auto ij = image_coords(input.mouse_pos, app->glparams.center,
         app->glparams.scale, app->render.imsize());
     if (ij.x >= 0 && ij.x < app->render.width() && ij.y >= 0 &&
@@ -833,11 +831,11 @@ void update_camera(const gui_input& input, app_states* apps) {
 void update_app(const gui_input& input, void* data) {
   auto apps = (app_states*)data;
 
-  update_camera(input, apps);
+  update_camera(apps, input);
   drop(apps, input);
   update(apps);
 
-  draw(apps, input);
+  draw_scene(apps, input);
   draw_widgets(apps, input);
 }
 

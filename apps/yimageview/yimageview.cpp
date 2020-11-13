@@ -320,10 +320,10 @@ void update_view(app_states* apps, const gui_input& input) {
   if (!apps->selected) return;
   auto app = apps->selected;
   // handle mouse
-  if (input.mouse_left && !input.widgets_active) {
+  if (input.mouse_left) {
     app->glparams.center += input.mouse_pos - input.mouse_last;
   }
-  if (input.mouse_right && !input.widgets_active) {
+  if (input.mouse_right) {
     app->glparams.scale *= powf(
         2, (input.mouse_pos.x - input.mouse_last.x) * 0.001f);
   }
@@ -360,7 +360,7 @@ int main(int argc, const char* argv[]) {
   auto window = new gui_window{};
   init_window(window, {1280 + 320, 720}, "yimageviews", true);
   window->user_data = apps;
-  apps->widgets      = create_imgui(window);
+  apps->widgets     = create_imgui(window);
 
   // run ui
   run_ui(window, update_app);

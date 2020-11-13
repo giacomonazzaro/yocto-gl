@@ -144,10 +144,10 @@ auto draw_widgets(app_state* app, const gui_input& input) {
 auto update_view(app_state* app, const gui_input& input) {
   if (is_active(&app->widgets)) return;
   // handle mouse
-  if (input.mouse_left && !input.widgets_active) {
+  if (input.mouse_left) {
     app->glparams.center += input.mouse_pos - input.mouse_last;
   }
-  if (input.mouse_right && !input.widgets_active) {
+  if (input.mouse_right) {
     app->glparams.scale *= powf(
         2, (input.mouse_pos.x - input.mouse_last.x) * 0.001f);
   }
