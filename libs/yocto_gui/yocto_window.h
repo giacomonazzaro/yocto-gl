@@ -139,7 +139,6 @@ struct gui_button {
   };
   state state = state::up;
 
-  // TODO(giacomo): needed to keep same API for now
   operator bool() const { return state == state::down; }
 };
 

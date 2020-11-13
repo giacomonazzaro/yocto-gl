@@ -31,14 +31,8 @@
 
 #include <yocto/yocto_commonio.h>
 
-#include <algorithm>
-#include <array>
-#include <cstdarg>
-#include <memory>
 #include <mutex>
-#include <stdexcept>
 #include <unordered_map>
-#include <utility>
 
 #include "ext/glad/glad.h"
 
@@ -64,11 +58,8 @@
 namespace yocto {
 
 // using directives
-using std::array;
 using std::mutex;
-using std::pair;
 using std::unordered_map;
-using namespace std::string_literals;
 
 }  // namespace yocto
 

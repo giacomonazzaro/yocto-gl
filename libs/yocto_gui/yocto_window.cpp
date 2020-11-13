@@ -27,7 +27,6 @@
 //
 //
 
-// TODO(giacomo): review inlcudes
 #include "yocto_window.h"
 
 #include <yocto/yocto_commonio.h>
