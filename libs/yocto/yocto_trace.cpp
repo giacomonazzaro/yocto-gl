@@ -774,10 +774,10 @@ trace_vsdf eval_vsdf(
   auto trdepth      = material->trdepth;
 
   // factors
-  auto vsdf    = trace_vsdf{};
-  vsdf.density = ((transmission != 0 || translucency != 0) && !thin)
-                     ? -log(clamp(color, 0.0001f, 1.0f)) / trdepth
-                     : zero3f;
+  auto vsdf       = trace_vsdf{};
+  vsdf.density    = ((transmission != 0 || translucency != 0) && !thin)
+                        ? -log(clamp(color, 0.0001f, 1.0f)) / trdepth
+                        : zero3f;
   vsdf.scatter    = scattering;
   vsdf.anisotropy = scanisotropy;
 
@@ -1148,7 +1148,7 @@ static vec3f sample_lights(const trace_scene* scene, const trace_lights* lights,
     auto instance = light->instance;
     auto element  = sample_discrete_cdf(light->elements_cdf, rel);
     auto uv       = (!instance->shape->triangles.empty()) ? sample_triangle(ruv)
-                                                    : ruv;
+                                                          : ruv;
     auto lposition = eval_position(light->instance, element, uv);
     return normalize(lposition - position);
   } else if (light->environment != nullptr) {
@@ -1239,6 +1239,10 @@ static vec4f trace_path(const trace_scene* scene, const trace_bvh* bvh,
     // intersect next point
     auto intersection = intersect_bvh(bvh, ray);
     if (!intersection.hit) {
+      if (bounce == 0) {
+        return {1, 1, 1, 1};
+        // break;
+      }
       if (bounce > 0 || !params.envhidden)
         radiance += weight * eval_environment(scene, ray.d);
       break;
@@ -1269,6 +1273,17 @@ static vec4f trace_path(const trace_scene* scene, const trace_bvh* bvh,
       auto emission = eval_emission(instance, element, uv, normal, outgoing);
       auto opacity  = eval_opacity(instance, element, uv, normal, outgoing);
       auto bsdf     = eval_bsdf(instance, element, uv, normal, outgoing);
+
+      if (bsdf.diffuse == vec3f{1, 1, 1} && bounce == 0) {
+        auto incoming = sample_diffuse_reflection(
+            normal, outgoing, rand2f(rng));
+        auto ray          = ray3f{position, incoming};
+        auto intersection = intersect_bvh(bvh, ray);
+        if (intersection.hit)
+          return {0, 0, 0, 1};
+        else
+          return {1, 1, 1, 1};
+      }
 
       // correct roughness
       if (params.nocaustics) {
@@ -1742,9 +1757,9 @@ void trace_sample(trace_state* state, const trace_scene* scene,
     sample = sample * (params.clamp / max(sample));
   state->accumulation[ij] += sample;
   state->samples[ij] += 1;
-  auto radiance = state->accumulation[ij].w != 0
-                      ? xyz(state->accumulation[ij]) / state->accumulation[ij].w
-                      : zero3f;
+  auto radiance     = state->accumulation[ij].w != 0
+                          ? xyz(state->accumulation[ij]) / state->accumulation[ij].w
+                          : zero3f;
   auto coverage     = state->accumulation[ij].w / state->samples[ij];
   state->render[ij] = {radiance.x, radiance.y, radiance.z, coverage};
 }
