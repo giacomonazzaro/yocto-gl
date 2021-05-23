@@ -48,6 +48,7 @@
 
 #include "yocto_geometry.h"
 #include "yocto_modelio.h"
+#include "yocto_shape.h"
 
 // #define TESTS_MAY_FAIL
 
@@ -71,21 +72,21 @@ using namespace std::string_literals;
 // -----------------------------------------------------------------------------
 // VECTOR HASHING
 // -----------------------------------------------------------------------------
-namespace std {
-
-// Hash functor for vector for use with hash_map
-template <>
-struct hash<yocto::vec2i> {
-  size_t operator()(const yocto::vec2i& v) const {
-    static const auto hasher = std::hash<int>();
-    auto              h      = (size_t)0;
-    h ^= hasher(v.x) + 0x9e3779b9 + (h << 6) + (h >> 2);
-    h ^= hasher(v.y) + 0x9e3779b9 + (h << 6) + (h >> 2);
-    return h;
-  }
-};
-
-}  // namespace std
+// namespace std {
+//
+//// Hash functor for vector for use with hash_map
+// template <>
+// struct hash<yocto::vec2i> {
+//  size_t operator()(const yocto::vec2i& v) const {
+//    static const auto hasher = std::hash<int>();
+//    auto              h      = (size_t)0;
+//    h ^= hasher(v.x) + 0x9e3779b9 + (h << 6) + (h >> 2);
+//    h ^= hasher(v.y) + 0x9e3779b9 + (h << 6) + (h >> 2);
+//    return h;
+//  }
+//};
+//
+//}  // namespace std
 
 // -----------------------------------------------------------------------------
 // UTILITIES
@@ -978,14 +979,113 @@ int find_small_edge(
   return -1;
 }
 
+inline vec2i make_key(int a, int b) {
+  return a < b ? vec2i{a, b} : vec2i{b, a};
+};
+
+static std::unordered_map<vec2i, int> add_vertices(vector<vec3i>& triangles,
+    vector<vec3f>& positions, const vector<bool>& split_faces,
+    float threshold) {
+  auto new_vertices = std::unordered_map<vec2i, int>{};
+
+  for (int face = 0; face < triangles.size(); face++) {
+    if (split_faces[face]) continue;
+    for (int k = 0; k < 3; k++) {
+      auto a   = triangles[face][k];
+      auto b   = triangles[face][(k + 1) % 3];
+      auto key = make_key(a, b);
+      auto it  = new_vertices.find(key);
+      if (it != new_vertices.end()) {
+        continue;
+      }
+
+      auto pa  = positions[a];
+      auto pb  = positions[b];
+      auto len = length(pa - pb);
+      if (len > threshold) {
+        auto new_vertex = (int)positions.size();
+        auto pos        = (pa + pb) / 2;
+        positions.push_back(pos);
+        new_vertices[key] = new_vertex;
+      }
+    }
+  }
+  return new_vertices;
+}
+
+static bool subdiv_shape(vector<vec3i>& triangles, vector<vec3f>& positions,
+    vector<int>& parent_faces, vector<bool>& split_faces, float threshold) {
+  auto new_vertices = add_vertices(
+      triangles, positions, split_faces, threshold);
+  printf("new_vertices: %d\n", (int)new_vertices.size());
+  auto num_faces = triangles.size();
+  for (int face = 0; face < num_faces; face++) {
+    if (split_faces[face]) continue;
+    auto abc = triangles[face];
+    for (int k = 0; k < 3; k++) {
+      auto a   = triangles[face][k];
+      auto b   = triangles[face][(k + 1) % 3];
+      auto key = make_key(a, b);
+      auto it  = new_vertices.find(key);
+      if (it != new_vertices.end()) {
+        abc[k] = it->second;
+      }
+    }
+    if (abc == triangles[face]) continue;
+
+    auto [x, y, z] = triangles[face];
+    auto [a, b, c] = abc;
+
+    auto add_triangle = [&](vec3i tr) {
+      if (tr.x == tr.y) return;
+      if (tr.y == tr.z) return;
+      if (tr.z == tr.x) return;
+      triangles.push_back(tr);
+      parent_faces.push_back(face);
+      split_faces.push_back(false);
+    };
+    add_triangle({x, a, c});
+    add_triangle({a, y, b});
+    add_triangle({c, b, z});
+    add_triangle({a, b, c});
+    split_faces[face] = true;
+  }
+  printf("parent_faces: %d\n", parent_faces.size());
+  return new_vertices.size() > 0;
+}
+
+vector<int> subdiv_shape(
+    vector<vec3i>& triangles, vector<vec3f>& positions, float threshold) {
+  auto parent_faces = vector<int>{};
+  auto split_faces  = vector<bool>(triangles.size(), false);
+  while (subdiv_shape(
+      triangles, positions, parent_faces, split_faces, threshold)) {
+  }
+  return parent_faces;
+}
+
 // Construct a graph to compute geodesic distances
-dual_geodesic_solver make_dual_geodesic_solver(const vector<vec3i>& triangles,
-    const vector<vec3f>& positions, const vector<vec3i>& adjacencies) {
-  auto solver = dual_geodesic_solver{};
+dual_geodesic_solver make_dual_geodesic_solver(const vector<vec3i>& _triangles,
+    const vector<vec3f>& _positions, float threshold) {
+  auto solver               = dual_geodesic_solver{};
+  solver.num_original_faces = (int)_triangles.size();
+  auto triangles            = _triangles;
+  auto positions            = _positions;
+
+  if (threshold > 0) {
+    solver.parent_faces = subdiv_shape(triangles, positions, threshold);
+  }
+  auto adjacencies = face_adjacencies(triangles);
+
   solver.centroids.resize(triangles.size());
 
   // Init centroids.
   for (int face = 0; face < triangles.size(); face++) {
+    if (triangles[face] == vec3i{0, 0, 0}) {
+      solver.centroids[face] = {0, 0, 0};
+      continue;
+    }
+
     vec3f pos[3] = {positions[triangles[face].x], positions[triangles[face].y],
         positions[triangles[face].z]};
     auto  l0     = length(pos[0] - pos[1]);
@@ -994,6 +1094,7 @@ dual_geodesic_solver make_dual_geodesic_solver(const vector<vec3i>& triangles,
     auto  p1     = (pos[1] + pos[2]) / 2;
     auto  l2     = length(pos[2] - pos[0]);
     auto  p2     = (pos[2] + pos[0]) / 2;
+    assert(l0 + l1 + l2);
     solver.centroids[face] = (l0 * p0 + l1 * p1 + l2 * p2) / (l0 + l1 + l2);
   }
 
@@ -3574,6 +3675,7 @@ static void search_strip(vector<float>& weight, vector<bool>& in_queue,
   while (!queue.empty()) {
     auto node           = queue.front();
     auto average_weight = (float)(cumulative_weight / queue.size());
+    assert(solver.centroids[node] != zero3f);
 
     // Large Label Last (see comment at the beginning)
     for (auto tries = 0; tries < queue.size() + 1; tries++) {
@@ -3597,6 +3699,7 @@ static void search_strip(vector<float>& weight, vector<bool>& in_queue,
       new_distance += solver.graph[node][i].length;
       new_distance += estimate_dist(neighbor);
       new_distance -= estimate_dist(node);
+      assert(isnormal(new_distance));
 
       auto old_distance = weight[neighbor];
       if (new_distance >= old_distance) continue;
@@ -3604,6 +3707,7 @@ static void search_strip(vector<float>& weight, vector<bool>& in_queue,
       if (in_queue[neighbor]) {
         // If neighbor already in queue, don't add it.
         // Just update cumulative weight.
+
         cumulative_weight += new_distance - old_distance;
       } else {
         // If neighbor not in queue, add node to queue using Small Label
@@ -3671,7 +3775,22 @@ static vector<int> compute_strip(const dual_geodesic_solver& solver,
     field[v]    = flt_max;
     in_queue[v] = false;
   }
-  return strip;
+
+  if (!solver.parent_faces.empty()) {
+    for (auto& face : strip) {
+      while (face > solver.num_original_faces) {
+        face = solver.parent_faces[face - solver.num_original_faces];
+      }
+    }
+    auto result = vector<int>{strip[0]};
+    result.reserve(strip.size());
+    for (int i = 1; i < strip.size(); i++) {
+      if (strip[i] != strip[i - 1]) result.push_back(strip[i]);
+    }
+    return result;
+  } else {
+    return strip;
+  }
 }
 
 static geodesic_path compute_geodesic_path(const dual_geodesic_solver& solver,

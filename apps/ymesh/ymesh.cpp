@@ -175,7 +175,9 @@ int run_glview(const glview_params& params) {
 #endif
 
 struct glpath_params {
-  string shape = "shape.ply";
+  string shape       = "shape.ply";
+  float  threshold   = 0.05;
+  bool   refine_mesh = 0;
 };
 
 // Cli
@@ -183,6 +185,8 @@ void add_command(cli_command& cli, const string& name, glpath_params& params,
     const string& usage) {
   auto& cmd = add_command(cli, name, usage);
   add_argument(cmd, "shape", params.shape, "Input shape.");
+  add_argument(cmd, "threshold", params.threshold, "Refine graph.");
+  add_argument(cmd, "refine", params.refine_mesh, "Refine mesh.");
 }
 
 #ifndef YOCTO_OPENGL
@@ -266,21 +270,28 @@ int run_glpath(const glpath_params& params) {
     ioshape.triangles = quads_to_triangles(ioshape.quads);
     ioshape.quads     = {};
   }
+  // rescale shape to unit
+  auto bbox = invalidb3f;
+  for (auto& pos : ioshape.positions) bbox = merge(bbox, pos);
+  for (auto& pos : ioshape.positions) pos -= center(bbox);
+  for (auto& pos : ioshape.positions) pos /= max(size(bbox));
 
   // create scene
   auto scene = make_pathscene(ioshape);
 
   // bvh
   auto& shape = scene.shapes.at(0);
-  auto  bvh   = make_triangles_bvh(shape.triangles, shape.positions, {});
+
+  auto bvh = make_triangles_bvh(shape.triangles, shape.positions, {});
 
   // stroke
   auto stroke = vector<shape_point>{};
 
   // geodesic solver
+  printf("threshold %f\n", params.threshold);
   auto adjacencies = face_adjacencies(shape.triangles);
   auto solver      = make_dual_geodesic_solver(
-      shape.triangles, shape.positions, adjacencies);
+      shape.triangles, shape.positions, params.threshold);
   auto bezier = true;
 
   // bezier algos
@@ -340,7 +351,7 @@ int run_glpath(const glpath_params& params) {
           for (auto [element, uv] : path) {
             ppositions.push_back(eval_position(shape, element, uv));
           }
-          scene.shapes.at(2) = polyline_to_cylinders(ppositions);
+          scene.shapes.at(2) = polyline_to_cylinders(ppositions, 8, 0.001);
           updated_shapes.push_back(2);
         }
       });
@@ -351,16 +362,16 @@ int run_glpath(const glpath_params& params) {
 
 #endif
 
-struct glpathd_params {
-  string shape = "shape.ply";
-};
+struct glpathd_params : glpath_params {};
 
-// Cli
-void add_command(cli_command& cli, const string& name, glpathd_params& params,
-    const string& usage) {
-  auto& cmd = add_command(cli, name, usage);
-  add_argument(cmd, "shape", params.shape, "Input shape.");
-}
+// // Cli
+// void add_command(cli_command& cli, const string& name, glpathd_params&
+// params,
+//     const string& usage) {
+//   auto& cmd = add_command(cli, name, usage);
+//   add_argument(cmd, "shape", params.shape, "Input shape.");
+//   add_argument(cmd, "threshold", params.threshold, "Refine graph.");
+// }
 
 #ifndef YOCTO_OPENGL
 
@@ -479,6 +490,10 @@ int run_glpathd(const glpathd_params& params) {
   for (auto& pos : ioshape.positions) pos -= center(bbox);
   for (auto& pos : ioshape.positions) pos /= max(size(bbox));
 
+  if (params.refine_mesh) {
+    subdiv_shape(ioshape.triangles, ioshape.positions, params.threshold);
+  }
+
   // reordina indici nei triangoli
   auto rng = rng_state{};
   for (auto& t : ioshape.triangles) {
@@ -495,8 +510,8 @@ int run_glpathd(const glpathd_params& params) {
 
   // geodesic solver
   auto adjacencies = face_adjacencies(shape.triangles);
-  auto solver      = make_dual_geodesic_solver(
-      shape.triangles, shape.positions, adjacencies);
+  auto solver      = make_dual_geodesic_solver(shape.triangles, shape.positions,
+      params.refine_mesh ? -1 : params.threshold);
 
   // other solver
   //  auto v2t = vertex_to_triangles(shape.triangles, shape.positions,

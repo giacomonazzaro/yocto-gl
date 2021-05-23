@@ -181,13 +181,18 @@ struct dual_geodesic_solver {
     int   node   = -1;
     float length = flt_max;
   };
-  vector<array<edge, 3>> graph     = {};
-  vector<vec3f>          centroids = {};
+  vector<array<edge, 3>> graph              = {};
+  vector<vec3f>          centroids          = {};
+  vector<int>            parent_faces       = {};
+  int                    num_original_faces = 0;
 };
+
+vector<int> subdiv_shape(
+    vector<vec3i>& triangles, vector<vec3f>& positions, float threshold);
 
 // Construct a graph to compute geodesic distances
 dual_geodesic_solver make_dual_geodesic_solver(const vector<vec3i>& triangles,
-    const vector<vec3f>& positions, const vector<vec3i>& adjacencies);
+    const vector<vec3f>& positions, float threshold);
 
 // Compute the shortest path connecting two surface points.
 vector<mesh_point> compute_shortest_path(const dual_geodesic_solver& graph,
