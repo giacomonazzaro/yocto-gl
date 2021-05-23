@@ -3066,17 +3066,19 @@ bool path_check_strip(
   return true;
 }
 
-static void remove_loops_from_strip(vector<int>& strip) {
+static bool remove_loops_from_strip(vector<int>& strip) {
   auto faces      = unordered_map<int, int>{};
   faces[strip[0]] = 0;
   auto result     = vector<int>(strip.size());
   result[0]       = strip[0];
   auto index      = 1;
+  bool found_loop = false;
   for (auto i = 1; i < strip.size(); ++i) {
-    if (faces.count(strip[i]) != 0) {
-      // printf("fixing %d (%d)\n", i, strip[i]);
+    if (!found_loop && faces.count(strip[i]) != 0) {
+      printf("[%s]: fixing %d (%d)\n", __FUNCTION__, i, strip[i]);
       auto t = faces[strip[i]];
       index  = t + 1;
+        found_loop = true;
       continue;
     }
     faces[strip[i]] = i;
@@ -3084,6 +3086,7 @@ static void remove_loops_from_strip(vector<int>& strip) {
   }
   result.resize(index);
   strip = result;
+  return found_loop;
 }
 
 struct funnel_point {
@@ -3422,7 +3425,7 @@ static vector<int> fix_strip(const vector<vec3i>& adjacencies,
     result.push_back(strip[i]);
 
   assert(path_check_strip(adjacencies, result));
-  remove_loops_from_strip(result);
+  while(remove_loops_from_strip(result)) {};
   assert(path_check_strip(adjacencies, result));
   return result;
 }
