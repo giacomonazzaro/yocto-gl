@@ -494,12 +494,12 @@ int run_glpathd(const glpathd_params& params) {
     subdiv_shape(ioshape.triangles, ioshape.positions, params.threshold);
   }
 
-  // reordina indici nei triangoli
-  auto rng = rng_state{};
-  for (auto& t : ioshape.triangles) {
-    auto o = rand1i(rng, 3);
-    t      = {t[(0 + o) % 3], t[(1 + o) % 3], t[(2 + o) % 3]};
-  }
+  // // reordina indici nei triangoli
+  // auto rng = rng_state{};
+  // for (auto& t : ioshape.triangles) {
+  //   auto o = rand1i(rng, 3);
+  //   t      = {t[(0 + o) % 3], t[(1 + o) % 3], t[(2 + o) % 3]};
+  // }
 
   // create scene
   auto scene = make_pathdscene(ioshape);
@@ -523,8 +523,8 @@ int run_glpathd(const glpathd_params& params) {
   //      true);
 
   // points at random
-  auto point1 = mesh_point{0, {0.5, 0.5}};
-  auto point2 = mesh_point{1, {0.5, 0.5}};
+  auto point1 = mesh_point{0, {1.0 / 3, 1.0 / 3}};
+  auto point2 = mesh_point{1, {1.0 / 3, 1.0 / 3}};
 
   // run viewer
   glview_scene(
