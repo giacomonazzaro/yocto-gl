@@ -429,6 +429,7 @@ static scene_model make_pathdscene(const scene_shape& ioshape) {
 
   // shapes
   scene.shapes.emplace_back(ioshape);
+
   scene.shapes.emplace_back(points_to_spheres({{0, 0, 0}}));
   scene.shapes.emplace_back(polyline_to_cylinders({{0, 0, 0}, {0, 0, 0}}));
   scene.shapes.emplace_back(polyline_to_cylinders({{0, 0, 0}, {0, 0, 0}}));
@@ -469,6 +470,32 @@ static scene_model make_pathdscene(const scene_shape& ioshape) {
   auto& edges_instance     = scene.instances.emplace_back();
   edges_instance.shape     = 6;
   edges_instance.material  = 6;
+
+  {
+    auto  edge_shape   = scene_shape{};
+    auto& instance     = scene.instances.emplace_back();
+    instance.shape     = (int)scene.shapes.size();
+    instance.material  = (int)scene.materials.size();
+    auto& material     = scene.materials.emplace_back();
+    material.color     = {0, 0, 1};
+    material.type      = scene_material_type::glossy;
+    material.roughness = 0.5;
+    auto& edges        = scene.shapes.emplace_back();
+    auto& mesh         = ioshape;
+    for (auto& tr : mesh.triangles) {
+      for (int k = 0; k < 3; k++) {
+        auto a = tr[k];
+        auto b = tr[(k + 1) % 3];
+        if (a > b) continue;
+        auto index = (int)edges.positions.size();
+        edges.radius.push_back(0.001);
+        edges.radius.push_back(0.001);
+        edges.lines.push_back({index, index + 1});
+        edges.positions.push_back(mesh.positions[a]);
+        edges.positions.push_back(mesh.positions[b]);
+      }
+    }
+  }
 
   // done
   return scene;
