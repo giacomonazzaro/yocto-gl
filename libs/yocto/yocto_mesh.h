@@ -184,10 +184,11 @@ struct dual_geodesic_solver {
   vector<array<edge, 3>> graph              = {};
   vector<vec3f>          centroids          = {};
   vector<int>            parent_faces       = {};
+  vector<int>            children_faces     = {};
   int                    num_original_faces = 0;
 };
 
-vector<int> subdiv_shape(
+pair<vector<int>, vector<int>> subdiv_shape(
     vector<vec3i>& triangles, vector<vec3f>& positions, float threshold);
 
 // Construct a graph to compute geodesic distances

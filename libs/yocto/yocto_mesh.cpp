@@ -1049,19 +1049,37 @@ static bool subdiv_shape(vector<vec3i>& triangles, vector<vec3f>& positions,
     add_triangle({c, b, z});
     add_triangle({a, b, c});
     split_faces[face] = true;
+    triangles[face]   = {0, 0, 0};
   }
   printf("parent_faces: %d\n", parent_faces.size());
   return new_vertices.size() > 0;
 }
 
-vector<int> subdiv_shape(
+pair<vector<int>, vector<int>> subdiv_shape(
     vector<vec3i>& triangles, vector<vec3f>& positions, float threshold) {
-  auto parent_faces = vector<int>{};
-  auto split_faces  = vector<bool>(triangles.size(), false);
+  auto  result             = pair<vector<int>, vector<int>>{};
+  auto& parent_faces       = result.first;
+  auto  num_original_faces = (int)triangles.size();
+  parent_faces             = vector<int>{};
+  auto split_faces         = vector<bool>(triangles.size(), false);
   while (subdiv_shape(
       triangles, positions, parent_faces, split_faces, threshold)) {
   }
-  return parent_faces;
+
+  auto& children_faces = result.second;
+  children_faces.assign(num_original_faces, -1);
+  for (int i = 0; i < parent_faces.size(); i++) {
+    auto face     = num_original_faces + i;
+    auto children = vector<int>{};
+    auto last     = face;
+    while (face >= num_original_faces) {
+      children.push_back(face);
+      face = parent_faces[face - num_original_faces];
+    }
+    children_faces[face] = last;
+  }
+
+  return result;
 }
 
 // Construct a graph to compute geodesic distances
@@ -1073,7 +1091,8 @@ dual_geodesic_solver make_dual_geodesic_solver(const vector<vec3i>& _triangles,
   auto positions            = _positions;
 
   if (threshold > 0) {
-    solver.parent_faces = subdiv_shape(triangles, positions, threshold);
+    tie(solver.parent_faces, solver.children_faces) = subdiv_shape(
+        triangles, positions, threshold);
   }
   auto adjacencies = face_adjacencies(triangles);
 
@@ -1494,6 +1513,23 @@ static vector<int> compute_strip(const dual_geodesic_solver& solver,
     const vector<vec3i>& triangles, const vector<vec3f>& positions,
     const mesh_point& start, const mesh_point& end);
 
+vector<int> reduce_strip(
+    const dual_geodesic_solver& solver, vector<int>& strip) {
+  if (solver.parent_faces.empty()) return strip;
+
+  for (auto& face : strip) {
+    while (face >= solver.num_original_faces) {
+      face = solver.parent_faces[face - solver.num_original_faces];
+    }
+  }
+  auto result = vector<int>{strip[0]};
+  result.reserve(strip.size());
+  for (int i = 1; i < strip.size(); i++) {
+    if (strip[i] != strip[i - 1]) result.push_back(strip[i]);
+  }
+  return result;
+}
+
 vector<mesh_point> compute_shortest_path(const dual_geodesic_solver& graph,
     const vector<vec3i>& triangles, const vector<vec3f>& positions,
     const vector<vec3i>& adjacencies, const mesh_point& start,
@@ -1507,6 +1543,7 @@ vector<mesh_point> compute_shortest_path(const dual_geodesic_solver& graph,
     // auto strip = strip_on_dual_graph(
     //     graph, triangles, positions, end.face, start.face);
     auto strip = compute_strip(graph, triangles, positions, end, start);
+    strip      = reduce_strip(graph, strip);
     path = shortest_path(triangles, positions, adjacencies, start, end, strip);
   }
 
@@ -1546,22 +1583,9 @@ vector<vec3f> visualize_shortest_path(const dual_geodesic_solver& graph,
       //     graph, triangles, positions, end.face, start.face);
       strip = compute_strip(graph, triangles, positions, end, start);
     }
-    auto get_triangle_center = [](const vector<vec3i>&  triangles,
-                                   const vector<vec3f>& positions,
-                                   int                  face) -> vec3f {
-      vec3f pos[3] = {positions[triangles[face].x],
-          positions[triangles[face].y], positions[triangles[face].z]};
-      auto  l0     = length(pos[0] - pos[1]);
-      auto  p0     = (pos[0] + pos[1]) / 2;
-      auto  l1     = length(pos[1] - pos[2]);
-      auto  p1     = (pos[1] + pos[2]) / 2;
-      auto  l2     = length(pos[2] - pos[0]);
-      auto  p2     = (pos[2] + pos[0]) / 2;
-      return (l0 * p0 + l1 * p1 + l2 * p2) / (l0 + l1 + l2);
-    };
+
     auto path = vector<vec3f>{};
-    for (auto face : strip)
-      path.push_back(get_triangle_center(triangles, positions, face));
+    for (auto face : strip) path.push_back(graph.centroids[face]);
     return path;
   } else {
     auto path = geodesic_path{};
@@ -2922,10 +2946,10 @@ static bool remove_loops_from_strip(vector<int>& strip) {
   bool found_loop = false;
   for (auto i = 1; i < strip.size(); ++i) {
     if (!found_loop && faces.count(strip[i]) != 0) {
-      printf("[%s]: fixing %d (%d)\n", __FUNCTION__, i, strip[i]);
-      auto t = faces[strip[i]];
-      index  = t + 1;
-        found_loop = true;
+      printf("[%s]: fixing %d (face %d)\n", __FUNCTION__, i, strip[i]);
+      auto t     = faces[strip[i]];
+      index      = t + 1;
+      found_loop = true;
       continue;
     }
     faces[strip[i]] = i;
@@ -3215,6 +3239,7 @@ bool check_point(const mesh_point& point) {
 static vector<int> fix_strip(const vector<vec3i>& adjacencies,
     const vector<int>& strip, int index, int k, bool left) {
   assert(index < strip.size() - 1);
+  assert(path_check_strip(adjacencies, strip));
   auto face = strip[index];
   if (!left) k = mod3(k + 2);
 
@@ -3271,8 +3296,9 @@ static vector<int> fix_strip(const vector<vec3i>& adjacencies,
   for (auto i = second_strip_intersection; i < strip.size(); ++i)
     result.push_back(strip[i]);
 
-  assert(path_check_strip(adjacencies, result));
-  while(remove_loops_from_strip(result)) {};
+  //  assert(path_check_strip(adjacencies, result));
+  while (remove_loops_from_strip(result)) {
+  };
   assert(path_check_strip(adjacencies, result));
   return result;
 }
@@ -3503,9 +3529,10 @@ template <typename Update>
 static void search_strip(vector<float>& weight, vector<bool>& in_queue,
     const dual_geodesic_solver& solver, const vector<vec3i>& triangles,
     const vector<vec3f>& positions, const mesh_point& start,
-    const mesh_point& end, Update&& update) {
-  auto start_pos = eval_position(triangles, positions, start);
-  auto end_pos   = eval_position(triangles, positions, end);
+    const vec3f& start_pos, const mesh_point& end, const vec3f& end_pos,
+    Update&& update) {
+  //  auto start_pos = eval_position(triangles, positions, start);
+  //  auto end_pos   = eval_position(triangles, positions, end);
 
   auto estimate_dist = [&](int face) {
     return length(solver.centroids[face] - end_pos);
@@ -3522,10 +3549,12 @@ static void search_strip(vector<float>& weight, vector<bool>& in_queue,
   cumulative_weight += weight[start.face];
   queue.push_back(start.face);
 
+  auto min_distance = flt_max;
+
   while (!queue.empty()) {
     auto node           = queue.front();
     auto average_weight = (float)(cumulative_weight / queue.size());
-    assert(solver.centroids[node] != zero3f);
+    //    assert(solver.centroids[node] != zero3f);
 
     // Large Label Last (see comment at the beginning)
     for (auto tries = 0; tries < queue.size() + 1; tries++) {
@@ -3539,6 +3568,8 @@ static void search_strip(vector<float>& weight, vector<bool>& in_queue,
     queue.pop_front();
     in_queue[node] = false;
     cumulative_weight -= weight[node];
+
+    if (weight[node] >= min_distance) continue;
 
     for (auto i = 0; i < (int)solver.graph[node].size(); i++) {
       auto neighbor = solver.graph[node][i].node;
@@ -3574,15 +3605,31 @@ static void search_strip(vector<float>& weight, vector<bool>& in_queue,
 
       // Update distance of neighbor.
       weight[neighbor] = new_distance;
-      if (update(node, neighbor, new_distance)) return;
+      if (neighbor == end.face && weight[neighbor] < min_distance) {
+        min_distance = weight[neighbor];
+      }
+      update(node, neighbor, new_distance);
     }
   }
 }
 
 static vector<int> compute_strip(const dual_geodesic_solver& solver,
     const vector<vec3i>& triangles, const vector<vec3f>& positions,
-    const mesh_point& start, const mesh_point& end) {
+    const mesh_point& _start, const mesh_point& _end) {
+  auto start     = _start;
+  auto end       = _end;
+  auto start_pos = eval_position(triangles, positions, _start);
+  auto end_pos   = eval_position(triangles, positions, _end);
+
   if (start.face == end.face) return {start.face};
+
+  if (solver.children_faces.size()) {
+    if (solver.children_faces[start.face] > 0)
+      start.face = solver.children_faces[start.face];
+
+    if (solver.children_faces[end.face] > 0)
+      end.face = solver.children_faces[end.face];
+  }
 
   thread_local static auto parents  = vector<int>{};
   thread_local static auto field    = vector<float>{};
@@ -3600,11 +3647,11 @@ static vector<int> compute_strip(const dual_geodesic_solver& solver,
   auto update  = [&visited, end](int node, int neighbor, float new_distance) {
     parents[neighbor] = node;
     visited.push_back(neighbor);
-    return neighbor == end.face;
+    // return neighbor == end.face;
   };
 
-  search_strip(
-      field, in_queue, solver, triangles, positions, start, end, update);
+  search_strip(field, in_queue, solver, triangles, positions, start, start_pos,
+      end, end_pos, update);
 
   // extract_strip
   auto strip = vector<int>{};
@@ -3626,21 +3673,7 @@ static vector<int> compute_strip(const dual_geodesic_solver& solver,
     in_queue[v] = false;
   }
 
-  if (!solver.parent_faces.empty()) {
-    for (auto& face : strip) {
-      while (face > solver.num_original_faces) {
-        face = solver.parent_faces[face - solver.num_original_faces];
-      }
-    }
-    auto result = vector<int>{strip[0]};
-    result.reserve(strip.size());
-    for (int i = 1; i < strip.size(); i++) {
-      if (strip[i] != strip[i - 1]) result.push_back(strip[i]);
-    }
-    return result;
-  } else {
-    return strip;
-  }
+  return strip;
 }
 
 static geodesic_path compute_geodesic_path(const dual_geodesic_solver& solver,
@@ -3657,6 +3690,7 @@ static geodesic_path compute_geodesic_path(const dual_geodesic_solver& solver,
     return path;
   }
   auto strip = compute_strip(solver, triangles, positions, end, start);
+  strip      = reduce_strip(solver, strip);
   path = shortest_path(triangles, positions, adjacencies, start, end, strip);
   return path;
 }
