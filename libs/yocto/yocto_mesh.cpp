@@ -3583,7 +3583,9 @@ static void search_strip(vector<float>& weight, vector<bool>& in_queue,
       assert(isnormal(new_distance));
 
       auto old_distance = weight[neighbor];
-      if (new_distance >= old_distance) continue;
+      // if (new_distance >= old_distance) continue; In floating point
+      // triangular inequality doesn't hold.
+      if (new_distance - old_distance >= -0.0001f) continue;
 
       if (in_queue[neighbor]) {
         // If neighbor already in queue, don't add it.
@@ -3645,6 +3647,7 @@ static vector<int> compute_strip(const dual_geodesic_solver& solver,
   auto visited = vector<int>{start.face};
   auto sources = vector<int>{start.face};
   auto update  = [&visited, end](int node, int neighbor, float new_distance) {
+    assert(parents[node] != neighbor);
     parents[neighbor] = node;
     visited.push_back(neighbor);
     // return neighbor == end.face;

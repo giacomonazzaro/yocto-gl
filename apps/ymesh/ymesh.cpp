@@ -501,6 +501,15 @@ static scene_model make_pathdscene(const scene_shape& ioshape) {
   return scene;
 }
 
+scene_shape polyline_shape(const vector<vec3f>& positions) {
+  auto shape = scene_shape{};
+  for (int i = 0; i < positions.size() - 1; ++i) {
+    shape.lines.push_back({i, i + 1});
+  }
+  shape.positions = positions;
+  return shape;
+}
+
 int run_glpathd(const glpathd_params& params) {
   // loading shape
   auto ioerror = ""s;
