@@ -1,20 +1,102 @@
 #pragma once
+#include <yocto/yocto_cli.h>
+#include <yocto/yocto_mesh.h>
+#include <yocto/yocto_sampling.h>
+#include <yocto/yocto_scene.h>
 #include <yocto/yocto_shape.h>
 
 #include "ext/flipout/flipout.h"
 using namespace yocto;
+using namespace flipout;
 
 struct spline_mesh : scene_shape {
-  vector<vec3i>        adjacencies = {};
-  dual_geodesic_solver dual_solver = {};
-  shape_bvh            bvh         = {};
+  vector<vec3i>        adjacencies  = {};
+  dual_geodesic_solver dual_solver  = {};
+  shape_bvh            bvh          = {};
+  flipout_mesh         flipout_mesh = {};
 };
 
-inline vector<mesh_point> compute_geodesic_path(
+struct test_params : spline_params {
+  bool flipout = false;
+};
+
+inline vector<mesh_point> shortest_path(
     const spline_mesh& mesh, const mesh_point& start, const mesh_point& end) {
   return compute_shortest_path(mesh.dual_solver, mesh.triangles, mesh.positions,
       mesh.adjacencies, start, end);
 }
+
+inline vector<vec3f> polyline_positions(
+    const spline_mesh& mesh, const vector<mesh_point>& control_points) {
+  auto points = vector<mesh_point>{};
+  for (int i = 0; i < control_points.size() - 1; i++) {
+    auto a  = control_points[i];
+    auto b  = control_points[i + 1];
+    auto pp = shortest_path(mesh, a, b);
+    points.insert(points.end(), pp.begin(), pp.end());
+  }
+  auto positions = vector<vec3f>(points.size());
+  for (int i = 0; i < points.size(); i++) {
+    positions[i] = eval_position(mesh.triangles, mesh.positions, points[i]);
+  }
+  return positions;
+}
+
+struct shortest_path_stats {
+  double initial_guess = 0;
+  double shortening    = 0;
+};
+
+inline shortest_path_stats test_shortest_path(const spline_mesh& mesh,
+    const mesh_point& start, const mesh_point& end, bool flipout) {
+  if (flipout) {
+    //    auto vertices = vector<int>(4);
+    //    for (int i = 0; i < 4; i++) {
+    //      vertices[i] = mesh.triangles[control_points[i].face][i % 3];
+    //    }
+    int  va       = mesh.triangles[start.face][0];
+    int  vb       = mesh.triangles[end.face][1];
+    auto polyline = create_path_from_points(
+        (ManifoldSurfaceMesh*)mesh.flipout_mesh.topology.get(),
+        (VertexPositionGeometry*)mesh.flipout_mesh.geometry.get(), va, vb);
+    return {polyline.second.initial_guess, polyline.second.shortening};
+  }
+
+  auto result = shortest_path_stats{};
+  auto path   = geodesic_path{};
+  auto t0     = simple_timer{};
+  auto strip  = compute_strip(
+      mesh.dual_solver, mesh.triangles, mesh.positions, end, start);
+  strip                = reduce_strip(mesh.dual_solver, strip);
+  result.initial_guess = elapsed_seconds(t0);
+
+  auto t1 = simple_timer{};
+  path    = shortest_path(
+      mesh.triangles, mesh.positions, mesh.adjacencies, start, end, strip);
+  result.shortening = elapsed_seconds(t1);
+
+  return result;
+}
+//
+// inline shortest_path_stats test_shortest_path(
+//    const spline_mesh& mesh, const mesh_point& start, const mesh_point& end) {
+//  auto result = shortest_path_stats{};
+//  auto path   = geodesic_path{};
+//  auto t0     = simple_timer{};
+//  auto strip  = compute_strip(
+//      mesh.dual_solver, mesh.triangles, mesh.positions, end, start);
+//  strip                = reduce_strip(mesh.dual_solver, strip);
+//  result.initial_guess = elapsed_seconds(t0);
+//
+//  auto t1 = simple_timer{};
+//  path    = shortest_path(mesh.triangles, mesh.positions, mesh.adjacencies,
+//  start, end, strip); result.shortening = elapsed_seconds(t1);
+//
+//  // get mesh points
+//  // return convert_mesh_path(
+//  // triangles, adjacencies, path.strip, path.lerps, path.start, path.end)
+//  // .points;
+//}
 
 inline vector<vec3f> eval_positions(const vector<vec3i>& triangles,
     const vector<vec3f>& positions, const vector<mesh_point>& points) {
@@ -25,16 +107,31 @@ inline vector<vec3f> eval_positions(const vector<vec3i>& triangles,
   return result;
 }
 
-inline vector<mesh_point> trace_path(
+inline vector<vec3f> bezier_curve(const spline_mesh& mesh,
+    const vector<mesh_point>& control_points, const test_params& params) {
+  if (params.flipout) {
+    auto vertices = vector<int>(4);
+    for (int i = 0; i < 4; i++) {
+      vertices[i] = mesh.triangles[control_points[i].face].x;
+    }
+    auto bezier = make_polyline(mesh.flipout_mesh.topology.get(),
+        mesh.flipout_mesh.geometry.get(), vertices);
+    subdivide_bezier(bezier.get(), params.subdivisions);
+    return path_positions(bezier.get());
+  }
+
+  auto points = compute_bezier_path(mesh.dual_solver, mesh.triangles,
+      mesh.positions, mesh.adjacencies, control_points, params);
+  return polyline_positions(mesh, points);
+}
+
+inline vector<mesh_point> shortest_path(
     const spline_mesh& mesh, const vector<mesh_point>& points) {
   // geodesic path
   auto path = vector<mesh_point>{};
   for (auto idx = 0; idx < (int)points.size() - 1; idx++) {
-    auto segment = compute_geodesic_path(mesh, points[idx], points[idx + 1]);
-    //    auto segment = convert_mesh_path(
-    //        mesh.triangles, mesh.adjacencies, p.strip, p.lerps, p.start,
-    //        p.end)
-    //                       .points;
+    auto segment = compute_shortest_path(mesh.dual_solver, mesh.triangles,
+        mesh.positions, mesh.adjacencies, points[idx], points[idx + 1]);
     path.insert(path.end(), segment.begin(), segment.end());
   }
   return path;
@@ -72,8 +169,8 @@ inline pair<bool, string> validate_mesh(
   //   if (tr.x == tr.y || tr.y == tr.z || tr.z == tr.x) {
   //     auto error = string(256, '\0');
   //     sprintf(error.data(),
-  //         "mesh contains the degenerate triangle [%d, %d, %d]\n", tr.x, tr.y,
-  //         tr.z);
+  //         "mesh contains the degenerate triangle [%d, %d, %d]\n", tr.x,
+  //         tr.y, tr.z);
   //     return {false, error};
   //   }
   // }

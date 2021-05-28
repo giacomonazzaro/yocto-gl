@@ -600,10 +600,12 @@ int run_glpathd(const glpathd_params& params) {
             positions1.push_back(eval_position(shape, element, uv));
           }
           scene.shapes.at(2) = polyline_to_cylinders(positions1, 4, 0.002);
+          // scene.shapes.at(2) = polyline_shape(positions1);
           updated_shapes.push_back(2);
           auto positions2    = visualize_shortest_path(solver, shape.triangles,
               shape.positions, adjacencies, point1, point2, true);
           scene.shapes.at(3) = polyline_to_cylinders(positions2, 4, 0.002);
+          // scene.shapes.at(3) = polyline_shape(positions2);
           updated_shapes.push_back(3);
           // auto path3 = visualize_shortest_path(solver2, shape.triangles,
           //     shape.positions, adjacencies, v2t, angles, point1, point2,

@@ -20,15 +20,20 @@ struct flipout_mesh {
   std::unique_ptr<VertexPositionGeometry> geometry;
 };
 
+struct flipout_path_stats {
+  double initial_guess = 0;
+  double shortening    = 0;
+};
+
 flipout_mesh make_flipout_mesh(
     const std::vector<vec3i>& triangles, const std::vector<vec3f>& positions);
 
 flipout_mesh load_flipout_mesh(const std::string& filename);
 
-std::unique_ptr<FlipEdgeNetwork> create_path_from_points(
-    ManifoldSurfaceMesh* mesh, VertexPositionGeometry* geometry,
-    int vertex_start, int vertex_end, float angleEPS = 1e-5,
-    bool straightenAtMarked = true);
+std::pair<std::unique_ptr<FlipEdgeNetwork>, flipout_path_stats>
+create_path_from_points(ManifoldSurfaceMesh* mesh,
+    VertexPositionGeometry* geometry, int vertex_start, int vertex_end,
+    float angleEPS = 1e-5, bool straightenAtMarked = true);
 
 void shorten_path(FlipEdgeNetwork* edge_network, float angleEPS = 1e-5,
     bool straightenAtMarked = true);

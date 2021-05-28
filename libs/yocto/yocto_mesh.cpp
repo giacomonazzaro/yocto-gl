@@ -1509,10 +1509,6 @@ void visit_geodesic_graph(vector<float>& field,
   }
 }
 
-static vector<int> compute_strip(const dual_geodesic_solver& solver,
-    const vector<vec3i>& triangles, const vector<vec3f>& positions,
-    const mesh_point& start, const mesh_point& end);
-
 vector<int> reduce_strip(
     const dual_geodesic_solver& solver, vector<int>& strip) {
   if (solver.parent_faces.empty()) return strip;
@@ -1547,7 +1543,9 @@ vector<mesh_point> compute_shortest_path(const dual_geodesic_solver& graph,
     path = shortest_path(triangles, positions, adjacencies, start, end, strip);
   }
 
+#if SPLINE_DEBUG
   for (auto& value : path.lerps) report_floating_point(value);
+#endif
 
   // get mesh points
   return convert_mesh_path(
@@ -3615,7 +3613,7 @@ static void search_strip(vector<float>& weight, vector<bool>& in_queue,
   }
 }
 
-static vector<int> compute_strip(const dual_geodesic_solver& solver,
+vector<int> compute_strip(const dual_geodesic_solver& solver,
     const vector<vec3i>& triangles, const vector<vec3f>& positions,
     const mesh_point& _start, const mesh_point& _end) {
   auto start     = _start;

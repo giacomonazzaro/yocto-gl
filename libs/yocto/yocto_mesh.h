@@ -210,6 +210,23 @@ vector<mesh_point> compute_straightest_path(const vector<vec3i>& triangles,
     const vector<vec3f>& positions, const vector<vec3i>& adjacencies,
     const mesh_point& start, const vec2f& direction, float path_length);
 
+enum struct spline_algorithm {
+  de_casteljau_uniform = 0,
+  de_casteljau_adaptive,
+  lane_riesenfeld_uniform,
+  lane_riesenfeld_adaptive
+};
+const auto spline_algorithm_names = vector<string>{
+    "dc-uniform", "dc-adaptive", "lr-uniform", "lr-adaptive"};
+
+struct spline_params {
+  spline_algorithm algorithm      = spline_algorithm::de_casteljau_uniform;
+  int              subdivisions   = 4;
+  float            precision      = 0.1f;
+  float            min_curve_size = 0.001f;
+  int              max_depth      = 10;
+};
+
 // compute a bezier on the surface
 vector<mesh_point> compute_bezier_path(const dual_geodesic_solver& solver,
     const vector<vec3i>& triangles, const vector<vec3f>& positions,
@@ -233,23 +250,6 @@ array<array<mesh_point, 4>, 2> insert_bezier_point(
     const vector<vec3f>& positions, const vector<vec3i>& adjacencies,
     const array<mesh_point, 4>& segment, float t, bool lane_riesenfeld,
     float precision = 0.1);
-
-enum struct spline_algorithm {
-  de_casteljau_uniform = 0,
-  de_casteljau_adaptive,
-  lane_riesenfeld_uniform,
-  lane_riesenfeld_adaptive
-};
-const auto spline_algorithm_names = vector<string>{
-    "dc-uniform", "dc-adaptive", "lr-uniform", "lr-adaptive"};
-
-struct spline_params {
-  spline_algorithm algorithm      = spline_algorithm::de_casteljau_uniform;
-  int              subdivisions   = 4;
-  float            precision      = 0.1f;
-  float            min_curve_size = 0.001f;
-  int              max_depth      = 10;
-};
 
 // compute a bezier on the surface
 vector<mesh_point> compute_bezier_path(const dual_geodesic_solver& solver,
@@ -353,6 +353,12 @@ mesh_point eval_path_point(const geodesic_path& path,
 // STRIPS
 // -----------------------------------------------------------------------------
 namespace yocto {
+
+vector<int> compute_strip(const dual_geodesic_solver& solver,
+    const vector<vec3i>& triangles, const vector<vec3f>& positions,
+    const mesh_point& start, const mesh_point& end);
+vector<int> reduce_strip(
+    const dual_geodesic_solver& solver, vector<int>& strip);
 
 // TODO(fabio): rename geodesic_strip
 vector<int> strip_on_dual_graph(const dual_geodesic_solver& solver,

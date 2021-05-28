@@ -26,11 +26,9 @@
 // POSSIBILITY OF SUCH DAMAGE.
 //
 
+#include "splinetest.h"
+
 #include <float.h>
-//#include <splinesurf/spline.h>
-//#include <splinesurf/splineio.h>
-//#include <splinesurf/strip.h>
-//#include <yocto/yocto_commonio.h>
 #include <yocto/yocto_cli.h>
 #include <yocto/yocto_math.h>
 #include <yocto/yocto_mesh.h>
@@ -39,14 +37,13 @@
 #include <yocto/yocto_shape.h>
 
 #include "scene_export.h"
-#include "splinetest.h"
 
 using namespace yocto;
 
 // void save_stats(const string& stats_name, json_value stats) {
 //  string ioerror;
 //  if (!make_directory(path_dirname(stats_name), ioerror))
-//  print_fatal(ioerror); if (!save_json(stats_name, stats, ioerror))
+//  pri nt_fatal(ioerror); if (!save_json(stats_name, stats, ioerror))
 //  print_fatal(ioerror);
 //}
 
@@ -65,7 +62,7 @@ int main(int argc, const char* argv[]) {
   auto mesh_name       = "mesh.ply"s;
   auto scene_name      = ""s;
   auto algorithm       = "dc"s;
-  auto params          = spline_params{};
+  auto params          = test_params{};
   auto save            = false;
 
   auto convert_bin_to_ply = false;
@@ -240,8 +237,10 @@ int main(int argc, const char* argv[]) {
     }
 
     try {
-      auto bezier1 = compute_bezier_path(mesh.dual_solver, mesh.triangles,
-          mesh.positions, mesh.adjacencies, points, 4);
+      auto bezier1 = bezier_curve(mesh, points, params);
+      // compute_bezier_path(mesh.dual_solver, mesh.triangles,
+      // mesh.positions, mesh.adjacencies, points, 4);
+
       //        trace_spline(mesh, points, params);
       auto& stat = spline_stats.emplace_back();
       stat.curve_length += (int)bezier1.size();
@@ -263,7 +262,7 @@ int main(int argc, const char* argv[]) {
         print_progress("save scene", progress.x++, progress.y++);
         auto scene_timer     = simple_timer{};
         auto scene           = scene_model{};
-        auto control_polygon = trace_path(mesh, points);
+        auto control_polygon = polyline_positions(mesh, points);
 
         make_scene_floating(mesh, scene, path_basename(mesh_name), camera_from,
             camera_to, camera_lens, camera_aspect, mesh.triangles,

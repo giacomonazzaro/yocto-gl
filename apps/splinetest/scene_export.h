@@ -80,10 +80,10 @@ int add_specular_material(scene_model& scene, const string& name,
 // }
 
 scene_shape path_to_lines(const vector<vec3i>& triangles,
-    const vector<vec3f>& positions, const vector<mesh_point>& path,
+    const vector<vec3f>& positions, const vector<vec3f>& path,
     float radius) {
   auto shape      = scene_shape{};
-  shape.positions = eval_positions(triangles, positions, path);
+    shape.positions = path; //eval_positions(triangles, positions, path);
   // shape.normals   = ...;  // TODO(fabio): tangents
   shape.radius = vector<float>(shape.positions.size(), radius);
   shape.lines  = vector<vec2i>(shape.positions.size() - 1);
@@ -92,10 +92,10 @@ scene_shape path_to_lines(const vector<vec3i>& triangles,
 }
 
 scene_shape path_to_points(const vector<vec3i>& triangles,
-    const vector<vec3f>& positions, const vector<mesh_point>& path,
+    const vector<vec3f>& positions, const vector<vec3f>& path,
     float radius) {
   auto shape      = scene_shape{};
-  shape.positions = eval_positions(triangles, positions, path);
+    shape.positions = path;//eval_positions(triangles, positions, path);
   // shape.normals   = ...;  // TODO(fabio): tangents
   shape.radius = vector<float>(shape.positions.size(), radius);
   shape.points = vector<int>(shape.positions.size());
@@ -104,9 +104,9 @@ scene_shape path_to_points(const vector<vec3i>& triangles,
 }
 
 scene_shape path_to_quads(const vector<vec3i>& triangles,
-    const vector<vec3f>& positions, const vector<mesh_point>& path,
+    const vector<vec3f>& positions, const vector<vec3f>& ppositions,
     float point_thickness, float line_thickness) {
-  auto ppositions = eval_positions(triangles, positions, path);
+//  auto ppositions = eval_positions(triangles, positions, path);
   auto shape      = scene_shape{};
   for (auto idx = 0; idx < ppositions.size(); idx++) {
     if (point_thickness > 0) {
@@ -136,7 +136,7 @@ void make_scene_floating(const spline_mesh& mesh, scene_model& scene,
     const string& mesh_name, vec3f camera_from, vec3f camera_to,
     float camera_lens, float camera_aspect, const vector<vec3i>& triangles,
     const vector<vec3f>& positions, const vector<mesh_point>& points,
-    const vector<mesh_point>& path, const vector<mesh_point>& curve,
+    const vector<vec3f>& path, const vector<vec3f>& curve,
     bool use_environment = false, bool points_as_meshes = true,
     float point_thickness = 0.006f, float line_thickness = 0.004f) {
   auto path_name  = mesh_name + "-path";
@@ -174,16 +174,19 @@ void make_scene_floating(const spline_mesh& mesh, scene_model& scene,
       add_specular_material(scene, "edges", mesh_color * 0.75, -1, 0.0));
   // scene.materials.back().opacity = 0.5;
 
-  auto control_polygon = vector<mesh_point>{};
-  for (int i = 0; i < 3; ++i) {
-    auto a  = points[i];
-    auto b  = points[i + 1];
-    auto pp = compute_geodesic_path(mesh, a, b);
-    // auto pp = convert_mesh_path(
-    //     mesh.triangles, mesh.adjacencies, p.strip, p.lerps, p.start, p.end)
-    //               .points;
-    control_polygon.insert(control_polygon.end(), pp.begin(), pp.end());
-  }
+  auto control_polygon = polyline_positions(mesh, points);
+  // vector<mesh_point>{};
+  // for (int i = 0; i < 3; ++i) {
+  //   auto a  = points[i];
+  //   auto b  = points[i + 1];
+  //   auto pp = compute_geodesic_path(mesh, a, b);
+  //   // auto pp = convert_mesh_path(
+  //   //     mesh.triangles, mesh.adjacencies, p.strip, p.lerps, p.start,
+  //   p.end)
+  //   //               .points;
+  //   control_polygon.insert(control_polygon.end(), pp.begin(), pp.end());
+  // }
+
   if (points_as_meshes) {
     add_instance(scene, "control_polygon", identity3x4f,
         add_shape(scene, "control_polygon",
@@ -198,35 +201,9 @@ void make_scene_floating(const spline_mesh& mesh, scene_model& scene,
         add_specular_material(scene, "control_polygon", {0, 0, 1}, -1, 0.2));
   }
 
-  // // path
-  // if (points_as_meshes) {
-  //   add_instance(scene, path_name, identity3x4f,
-  //       add_shape(scene, path_name,
-  //           path_to_quads(
-  //               triangles, positions, path, line_thickness, line_thickness)),
-  //       add_specular_material(scene, path_name, {0.0, 0.0, 1.0}, nullptr,
-  //       0.2));
-  // } else {
-  //   add_instance(scene, path_name, identity3x4f,
-  //       add_shape(scene, path_name,
-  //           path_to_lines(triangles, positions, path, line_thickness)),
-  //       add_specular_material(scene, path_name, {0.0, 0.0, 1.0}, nullptr,
-  //       0.2));
-  // }
-
   // curve
   // printf("%d: %f\n", trial, stat.seconds);
-  auto bezier_points = vector<mesh_point>{};
-  for (int i = 0; i < curve.size() - 1; i++) {
-    auto a  = curve[i];
-    auto b  = curve[i + 1];
-    auto pp = compute_geodesic_path(mesh, a, b);
-    //    auto pp = convert_mesh_path(
-    //        mesh.triangles, mesh.adjacencies, p.strip, p.lerps, p.start,
-    //        p.end)
-    //                  .points;
-    bezier_points.insert(bezier_points.end(), pp.begin(), pp.end());
-  }
+  auto& bezier_points = curve;
   if (points_as_meshes) {
     add_instance(scene, path_name, identity3x4f,
         add_shape(scene, path_name,
@@ -241,17 +218,18 @@ void make_scene_floating(const spline_mesh& mesh, scene_model& scene,
   }
 
   // points
-  if (points_as_meshes) {
-    add_instance(scene, pointsname, identity3x4f,
-        add_shape(scene, pointsname,
-            path_to_quads(triangles, positions, points, point_thickness, 0)),
-        add_specular_material(scene, pointsname, {0, 0, 1}, -1, 0.2));
-  } else {
-    add_instance(scene, pointsname, identity3x4f,
-        add_shape(scene, pointsname,
-            path_to_points(triangles, positions, points, point_thickness)),
-        add_specular_material(scene, pointsname, {0, 0, 1}, -1, 0.2));
-  }
+    // TODO(giacomo): incomplete
+//  if (points_as_meshes) {
+//    add_instance(scene, pointsname, identity3x4f,
+//        add_shape(scene, pointsname,
+//            path_to_quads(triangles, positions, points, point_thickness, 0)),
+//        add_specular_material(scene, pointsname, {0, 0, 1}, -1, 0.2));
+//  } else {
+//    add_instance(scene, pointsname, identity3x4f,
+//        add_shape(scene, pointsname,
+//            path_to_points(triangles, positions, points, point_thickness)),
+//        add_specular_material(scene, pointsname, {0, 0, 1}, -1, 0.2));
+//  }
 
   // environment
   // TODO(fabio): environment

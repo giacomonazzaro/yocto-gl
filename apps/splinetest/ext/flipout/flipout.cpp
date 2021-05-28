@@ -1,6 +1,7 @@
 #include "flipout.h"
 
 #include <geometrycentral/surface/surface_mesh_factories.h>
+#include <yocto/yocto_cli.h>
 
 using namespace geometrycentral;
 using namespace geometrycentral::surface;
@@ -56,22 +57,33 @@ void shorten_path(
             << " flips. " << std::endl;
 }
 
-std::unique_ptr<FlipEdgeNetwork> create_path_from_points(
-    ManifoldSurfaceMesh* mesh, VertexPositionGeometry* geometry,
-    int vertex_start, int vertex_end, float angleEPS, bool straightenAtMarked) {
+std::pair<std::unique_ptr<FlipEdgeNetwork>, flipout_path_stats>
+create_path_from_points(ManifoldSurfaceMesh* mesh,
+    VertexPositionGeometry* geometry, int vertex_start, int vertex_end,
+    float angleEPS, bool straightenAtMarked) {
   if (vertex_start == -1 || vertex_end == -1) return {};
 
-  START_TIMING(dijkstra)
-  auto edge_network = FlipEdgeNetwork::constructFromDijkstraPath(
-      *mesh, *geometry, mesh->vertex(vertex_start), mesh->vertex(vertex_end));
-  FINISH_TIMING_PRINT(dijkstra)
+  auto result =
+      std::pair<std::unique_ptr<FlipEdgeNetwork>, flipout_path_stats>{};
 
-  if (edge_network == nullptr) {
-    return edge_network;
-  }
-  edge_network->posGeom = geometry;
-  shorten_path(edge_network.get(), angleEPS, straightenAtMarked);
-  return edge_network;
+  
+    auto  t0        = simple_timer();
+    auto& edge_network = result.first;
+    edge_network       = FlipEdgeNetwork::constructFromDijkstraPath(
+        *mesh, *geometry, mesh->vertex(vertex_start), mesh->vertex(vertex_end));
+    result.second.initial_guess = elapsed_seconds(t0);
+  
+
+  
+    auto t1 = simple_timer();
+    if (edge_network == nullptr) {
+      return result;
+    }
+    edge_network->posGeom = geometry;
+    shorten_path(edge_network.get(), angleEPS, straightenAtMarked);
+    result.second.shortening = elapsed_seconds(t1);
+  
+  return result;
 }
 
 std::unique_ptr<FlipEdgeNetwork> make_polyline(ManifoldSurfaceMesh* mesh,
