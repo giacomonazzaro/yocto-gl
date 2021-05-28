@@ -7,3 +7,5 @@ set(GLFW_INSTALL OFF CACHE BOOL " " FORCE)
 add_subdirectory(glfw)
 
 endif(YOCTO_OPENGL)
+
+add_subdirectory(geometry-central)
