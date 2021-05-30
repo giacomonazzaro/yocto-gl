@@ -40,12 +40,39 @@
 
 using namespace yocto;
 
-// void save_stats(const string& stats_name, json_value stats) {
-//  string ioerror;
-//  if (!make_directory(path_dirname(stats_name), ioerror))
-//  pri nt_fatal(ioerror); if (!save_json(stats_name, stats, ioerror))
-//  print_fatal(ioerror);
-//}
+// default camera
+struct camera_settings {
+  vec3f from   = {0, 0, 3};
+  vec3f to     = {0, 0, 0};
+  float lens   = 0.100f;
+  float aspect = 0;
+};
+
+void save_scene(const string& scene_name, const string& mesh_name,
+    const spline_mesh& mesh, const vector<vec3f>& bezier,
+    const vector<vec3f>& control_polygon, const vector<mesh_point>& points,
+    const camera_settings& camera) {
+  string ioerror;
+  if (!make_directory(path_dirname(scene_name), ioerror)) print_fatal(ioerror);
+  if (!make_directory(path_join(path_dirname(scene_name), "shapes"), ioerror))
+    print_fatal(ioerror);
+  if (!make_directory(path_join(path_dirname(scene_name), "textures"), ioerror))
+    print_fatal(ioerror);
+
+  //  print_progress("save scene", progress.x++, progress.y++);
+  auto scene_timer = simple_timer{};
+  auto scene       = scene_model{};
+
+  make_scene_floating(mesh, scene, path_basename(mesh_name), camera.from,
+      camera.to, camera.lens, camera.aspect, mesh.triangles, mesh.positions,
+      points, control_polygon, bezier);
+
+  if (!save_scene(scene_name, scene, ioerror)) print_fatal(ioerror);
+  // stats["scene"]             =
+  //        json_value::object(); stats["scene"]["time"]     =
+  //        elapsed_nanoseconds(scene_timer); stats["scene"]["filename"] =
+  //        scene_name;
+}
 
 // -----------------------------------------------------------------------------
 // MAIN FUNCTION
@@ -114,12 +141,6 @@ int main(int argc, const char* argv[]) {
     timings_name = path_join(output_name, "timings.csv");
   }
 
-  if (timings_name.size() && !append_timings) {
-    auto timings_file = fopen(timings_name.c_str(), "w");
-    fprintf(timings_file, "model,triangles,trial,length,seconds\n");
-    fclose(timings_file);
-  }
-
   // mesh data
   auto mesh = spline_mesh{};
 
@@ -129,29 +150,13 @@ int main(int argc, const char* argv[]) {
 
   // load mesh
   print_progress("load mesh", progress.x++, progress.y);
-  auto ioerror    = ""s;
-  auto load_timer = simple_timer{};
-  auto ext        = path_extension(mesh_name);
-  if (ext == ".stl") {
-    //    load_mesh_stl(mesh, mesh_name);
-  } else if (ext == ".bin") {
-    //    auto ss = make_reader(mesh_name, 1e4);
-    //    serialize_vector(ss, mesh.positions);
-    //    serialize_vector(ss, mesh.triangles);
-    //    close_serializer(ss);
-    //    if (convert_bin_to_ply) {
-    //      auto name = replace_extension(mesh_name, ".ply");
-    //      save_mesh(name, mesh.triangles, mesh.positions, ioerror);
-    //      return 0;
-    //    }
-  } else {
-    if (!load_shape(mesh_name, mesh, ioerror)) print_fatal(ioerror);
-  }
+  auto ioerror = ""s;
+  if (!load_shape(mesh_name, mesh, ioerror)) print_fatal(ioerror);
 
-  // if (algorithm == "flipout") {
-  //   mesh.flipout = flipout::make_flipout_mesh(mesh.triangles,
-  //   mesh.positions);
-  // }
+  if (algorithm == "flipout") {
+    mesh.flipout_mesh = flipout::make_flipout_mesh(
+        mesh.triangles, mesh.positions);
+  }
   mesh.adjacencies = face_adjacencies(mesh.triangles);
   //  stats["load_time"] = elapsed_nanoseconds(load_timer);
   //  stats["filename"]  = mesh_name;
@@ -181,13 +186,6 @@ int main(int argc, const char* argv[]) {
     position = (position - center(bbox)) / max(size(bbox));
   //  stats["rescale_time"] = elapsed_nanoseconds(rescale_timer);
 
-  // spline params
-  //  if (!parse_spline_algorithm(params.algorithm, algorithm)) {
-  //    print_fatal("'" + algorithm + "' is not a valid algorithm");
-  //  }
-
-  // Setup test
-
   // build bvh
   print_progress("build bvh", progress.x++, progress.y);
   auto bvh_timer = simple_timer{};
@@ -198,7 +196,7 @@ int main(int argc, const char* argv[]) {
   print_progress("build graph", progress.x++, progress.y);
   auto graph_timer = simple_timer{};
   mesh.dual_solver = make_dual_geodesic_solver(
-      mesh.triangles, mesh.positions, 0.01);
+      mesh.triangles, mesh.positions, 0.05);
   //  stats["solver_time"] = elapsed_nanoseconds(graph_timer);
 
   progress = {0, trials};
@@ -207,21 +205,20 @@ int main(int argc, const char* argv[]) {
     int    curve_length;
     int    trial;
     double seconds;
-    double control_polygon_seconds;
+    double initial_guess_seconds;
+    double shortening_seconds;
+    string error;
   };
   int  num_passed   = 0;
   auto spline_stats = vector<spline_stat>{};
 
-  // default camera
-  auto camera_from   = vec3f{0, 0, 3};
-  auto camera_to     = vec3f{0, 0, 0};
-  auto camera_lens   = 0.100f;
-  auto camera_aspect = size(bbox).x / size(bbox).y;
+  auto camera   = camera_settings{};
+  camera.aspect = size(bbox).x / size(bbox).y;
 
+  auto success = false;
   for (auto trial = 0; trial < trials; trial++) {
-    if (selected_trial != -1 && trial != selected_trial) {
-      continue;
-    }
+    if (selected_trial != -1 && trial != selected_trial) continue;
+
     print_progress("running trials", progress.x++, progress.y);
     size_t dummy;
     auto   hash = 0;
@@ -230,52 +227,30 @@ int main(int argc, const char* argv[]) {
     } catch (std::exception e) {
     }
     auto points = sample_points(mesh.triangles, mesh.positions, bbox, mesh.bvh,
-        camera_from, camera_to, camera_lens, camera_aspect, trial + hash);
-    auto bezier1_timer = simple_timer{};
-    if (trial == 0) {
-      // Measure time for computing control polygon.
-    }
+        camera.from, camera.to, camera.lens, camera.aspect, trial + hash);
 
+    auto& stat = spline_stats.emplace_back();
+
+    // Try computing bezier curve.
     try {
-      auto bezier1 = bezier_curve(mesh, points, params);
-      // compute_bezier_path(mesh.dual_solver, mesh.triangles,
-      // mesh.positions, mesh.adjacencies, points, 4);
+      auto bezier_timer = simple_timer{};
+      auto bezier       = bezier_curve(mesh, points, params);
+      stat.seconds      = double(elapsed_nanoseconds(bezier_timer)) / 1e9;
 
-      //        trace_spline(mesh, points, params);
-      auto& stat = spline_stats.emplace_back();
-      stat.curve_length += (int)bezier1.size();
-      stat.seconds = double(elapsed_nanoseconds(bezier1_timer)) / 1e9;
-      stat.trial   = trial;
+      stat.curve_length += (int)bezier.size();
+      stat.trial = trial;
       num_passed += 1;
 
+      auto control_polygon = polyline_positions(mesh, points);
+
       // save scene
-      if (scene_name.size()) {
-        if (!make_directory(path_dirname(scene_name), ioerror))
-          print_fatal(ioerror);
-        if (!make_directory(
-                path_join(path_dirname(scene_name), "shapes"), ioerror))
-          print_fatal(ioerror);
-        if (!make_directory(
-                path_join(path_dirname(scene_name), "textures"), ioerror))
-          print_fatal(ioerror);
-
-        print_progress("save scene", progress.x++, progress.y++);
-        auto scene_timer     = simple_timer{};
-        auto scene           = scene_model{};
-        auto control_polygon = polyline_positions(mesh, points);
-
-        make_scene_floating(mesh, scene, path_basename(mesh_name), camera_from,
-            camera_to, camera_lens, camera_aspect, mesh.triangles,
-            mesh.positions, points, control_polygon, bezier1);
-
-        if (!save_scene(scene_name, scene, ioerror)) print_fatal(ioerror);
-        // stats["scene"]             =
-        //        json_value::object(); stats["scene"]["time"]     =
-        //        elapsed_nanoseconds(scene_timer); stats["scene"]["filename"] =
-        //        scene_name;
+      if (scene_name.size() && !success) {
+        save_scene(scene_name, mesh_name, mesh, bezier, control_polygon, points,
+            camera);
+        success = true;
       }
     } catch (std::exception& e) {
-      //      stats["trial " + std::to_string(trial)] = e.what();
+      stat.error = e.what();
     }
   }
 
@@ -304,12 +279,18 @@ int main(int argc, const char* argv[]) {
   print_progress("trials done", progress.x++, progress.y);
 
   // output timings
+  if (timings_name.size() && !append_timings) {
+    auto timings_file = fopen(timings_name.c_str(), "w");
+    fprintf(timings_file, "model,triangles,trial,num_points,seconds,error\n");
+    fclose(timings_file);
+  }
+
   if (timings_name.size()) {
     auto timings_file = fopen(timings_name.c_str(), "a");
     for (auto& stat : spline_stats) {
-      fprintf(timings_file, "%s, %d, %d, %d, %.15f\n", mesh_name.c_str(),
+      fprintf(timings_file, "%s, %d, %d, %d, %.15f %s\n", mesh_name.c_str(),
           (int)mesh.triangles.size(), stat.trial, stat.curve_length,
-          stat.seconds);
+          stat.seconds, stat.error.c_str());
     }
     fclose(timings_file);
   }
