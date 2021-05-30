@@ -55,7 +55,7 @@ inline shortest_path_stats test_shortest_path(const spline_mesh& mesh,
     //      vertices[i] = mesh.triangles[control_points[i].face][i % 3];
     //    }
     int  va       = mesh.triangles[start.face][0];
-    int  vb       = mesh.triangles[end.face][1];
+    int  vb       = mesh.triangles[end.face][0];
     auto polyline = create_path_from_points(
         (ManifoldSurfaceMesh*)mesh.flipout_mesh.topology.get(),
         (VertexPositionGeometry*)mesh.flipout_mesh.geometry.get(), va, vb);
@@ -83,8 +83,8 @@ inline shortest_path_stats test_control_polygon(
   auto result = shortest_path_stats{};
   if (flipout) {
     for (int i = 0; i < 3; i++) {
-      int  va       = mesh.triangles[points[i].face][i % 3];
-      int  vb       = mesh.triangles[points[i + 1].face][(i + 1) % 3];
+      int  va       = mesh.triangles[points[i].face][0];
+      int  vb       = mesh.triangles[points[i + 1].face][0];
       auto polyline = create_path_from_points(
           (ManifoldSurfaceMesh*)mesh.flipout_mesh.topology.get(),
           (VertexPositionGeometry*)mesh.flipout_mesh.geometry.get(), va, vb);

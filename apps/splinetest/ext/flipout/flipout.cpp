@@ -48,13 +48,13 @@ void shorten_path(
   size_t iterLim   = INVALID_IND;
   double lengthLim = 0.;
 
-  START_TIMING(shorten)
+  // START_TIMING(shorten)
   edge_network->iterativeShorten(iterLim, lengthLim);
-  FINISH_TIMING_PRINT(shorten)
+  // FINISH_TIMING_PRINT(shorten)
 
-  std::cout << "shortening performed " << edge_network->nShortenIters
-            << " iterations, with a total of " << edge_network->nFlips
-            << " flips. " << std::endl;
+  // std::cout << "shortening performed " << edge_network->nShortenIters
+  //           << " iterations, with a total of " << edge_network->nFlips
+  //           << " flips. " << std::endl;
 }
 
 std::pair<std::unique_ptr<FlipEdgeNetwork>, flipout_path_stats>

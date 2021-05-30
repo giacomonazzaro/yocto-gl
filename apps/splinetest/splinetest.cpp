@@ -63,9 +63,8 @@ void save_scene(const string& scene_name, const string& mesh_name,
   auto scene_timer = simple_timer{};
   auto scene       = scene_model{};
 
-  make_scene_floating(mesh, scene, path_basename(mesh_name), camera.from,
-      camera.to, camera.lens, camera.aspect, mesh.triangles, mesh.positions,
-      points, control_polygon, bezier);
+  make_scene_floating(mesh, scene, camera.from, camera.to, camera.lens,
+      camera.aspect, points, control_polygon, bezier);
 
   if (!save_scene(scene_name, scene, ioerror)) print_fatal(ioerror);
   // stats["scene"]             =
@@ -117,11 +116,20 @@ int main(int argc, const char* argv[]) {
 
   // Set parameter of algorithm.
   add_option(cli, "algorithm", algorithm,
-      "bezier algorithm {dc-uniform,lr-uniform,dc-adaptive,lr-adaptiveflipout}");
+      "bezier algorithm {dc-uniform,lr-uniform,dc-adaptive,lr-adaptive,flipout}");
   add_option(cli, "precision", params.precision, "for adaptive algorithms");
   add_option(cli, "subdivisions", params.subdivisions, "for uniform algorithms",
       {1, 10});
   parse_cli(cli, argc, argv);
+
+  if (algorithm == "flipout") {
+    params.flipout = true;
+  } else {
+    for (auto i = 0; i < spline_algorithm_names.size(); i++) {
+      if (algorithm == spline_algorithm_names[i])
+        params.algorithm = (spline_algorithm)i;
+    }
+  }
 
   auto model_basename = path_basename(mesh_name);
   auto path_name      = ""s;
@@ -152,11 +160,6 @@ int main(int argc, const char* argv[]) {
   print_progress("load mesh", progress.x++, progress.y);
   auto ioerror = ""s;
   if (!load_shape(mesh_name, mesh, ioerror)) print_fatal(ioerror);
-
-  if (algorithm == "flipout") {
-    mesh.flipout_mesh = flipout::make_flipout_mesh(
-        mesh.triangles, mesh.positions);
-  }
   mesh.adjacencies = face_adjacencies(mesh.triangles);
   //  stats["load_time"] = elapsed_nanoseconds(load_timer);
   //  stats["filename"]  = mesh_name;
@@ -185,6 +188,11 @@ int main(int argc, const char* argv[]) {
   for (auto& position : mesh.positions)
     position = (position - center(bbox)) / max(size(bbox));
   //  stats["rescale_time"] = elapsed_nanoseconds(rescale_timer);
+
+  if (params.flipout) {
+    mesh.flipout_mesh = flipout::make_flipout_mesh(
+        mesh.triangles, mesh.positions);
+  }
 
   // build bvh
   print_progress("build bvh", progress.x++, progress.y);
@@ -228,17 +236,19 @@ int main(int argc, const char* argv[]) {
     }
     auto points = sample_points(mesh.triangles, mesh.positions, bbox, mesh.bvh,
         camera.from, camera.to, camera.lens, camera.aspect, trial + hash);
+    if (params.flipout) {
+      for (auto& p : points) p.uv = {0, 0};
+    }
 
     auto& stat = spline_stats.emplace_back();
     try {
-      auto path_stats = test_control_polygon(
-          mesh, points, algorithm == "flipout");
+      auto path_stats = test_control_polygon(mesh, points, params.flipout);
       stat.initial_guess_seconds += path_stats.initial_guess;
       stat.shortening_seconds += path_stats.shortening;
     } catch (std::exception& e) {
-        stat.error = e.what();
-        continue;
-      }
+      stat.error = e.what();
+      continue;
+    }
 
     // Try computing bezier curve.
     try {
@@ -298,7 +308,7 @@ int main(int argc, const char* argv[]) {
   if (timings_name.size()) {
     auto timings_file = fopen(timings_name.c_str(), "a");
     for (auto& stat : spline_stats) {
-      fprintf(timings_file, "%s, %d, %d, %d, %.15f, %.15f, %.15f %s\n",
+      fprintf(timings_file, "%s, %d, %d, %d, %.15f, %.15f, %.15f, %s\n",
           mesh_name.c_str(), (int)mesh.triangles.size(), stat.trial,
           stat.curve_length, stat.seconds, stat.initial_guess_seconds,
           stat.shortening_seconds, stat.error.c_str());
