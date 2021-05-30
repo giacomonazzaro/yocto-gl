@@ -1017,7 +1017,7 @@ static bool subdiv_shape(vector<vec3i>& triangles, vector<vec3f>& positions,
     vector<int>& parent_faces, vector<bool>& split_faces, float threshold) {
   auto new_vertices = add_vertices(
       triangles, positions, split_faces, threshold);
-  printf("new_vertices: %d\n", (int)new_vertices.size());
+  // printf("new_vertices: %d\n", (int)new_vertices.size());
   auto num_faces = triangles.size();
   for (int face = 0; face < num_faces; face++) {
     if (split_faces[face]) continue;
@@ -1051,7 +1051,7 @@ static bool subdiv_shape(vector<vec3i>& triangles, vector<vec3f>& positions,
     split_faces[face] = true;
     triangles[face]   = {0, 0, 0};
   }
-  printf("parent_faces: %d\n", parent_faces.size());
+  // printf("parent_faces: %d\n", parent_faces.size());
   return new_vertices.size() > 0;
 }
 
@@ -2929,7 +2929,7 @@ bool path_check_strip(
   faces.insert(strip[0]);
   for (auto i = 1; i < strip.size(); ++i) {
     if (faces.count(strip[i]) != 0) {
-      printf("strip[%d] (face: %d) appears twice\n", i, strip[i]);
+      // printf("strip[%d] (face: %d) appears twice\n", i, strip[i]);
     }
     faces.insert(strip[i]);
     assert(find_in_vec(adjacencies[strip[i - 1]], strip[i]) != -1);
@@ -2947,7 +2947,7 @@ static bool remove_loops_from_strip(vector<int>& strip) {
   bool found_loop = false;
   for (auto i = 1; i < strip.size(); ++i) {
     if (!found_loop && faces.count(strip[i]) != 0) {
-      printf("[%s]: fixing %d (face %d)\n", __FUNCTION__, i, strip[i]);
+      // printf("[%s]: fixing %d (face %d)\n", __FUNCTION__, i, strip[i]);
       auto t     = faces[strip[i]];
       index      = t + 1;
       found_loop = true;
