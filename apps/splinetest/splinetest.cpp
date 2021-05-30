@@ -230,6 +230,15 @@ int main(int argc, const char* argv[]) {
         camera.from, camera.to, camera.lens, camera.aspect, trial + hash);
 
     auto& stat = spline_stats.emplace_back();
+    try {
+      auto path_stats = test_control_polygon(
+          mesh, points, algorithm == "flipout");
+      stat.initial_guess_seconds += path_stats.initial_guess;
+      stat.shortening_seconds += path_stats.shortening;
+    } catch (std::exception& e) {
+        stat.error = e.what();
+        continue;
+      }
 
     // Try computing bezier curve.
     try {
@@ -281,16 +290,18 @@ int main(int argc, const char* argv[]) {
   // output timings
   if (timings_name.size() && !append_timings) {
     auto timings_file = fopen(timings_name.c_str(), "w");
-    fprintf(timings_file, "model,triangles,trial,num_points,seconds,error\n");
+    fprintf(timings_file,
+        "model,triangles,trial,num_points,bezier(s),initial_guess(s),shortening(s),error\n");
     fclose(timings_file);
   }
 
   if (timings_name.size()) {
     auto timings_file = fopen(timings_name.c_str(), "a");
     for (auto& stat : spline_stats) {
-      fprintf(timings_file, "%s, %d, %d, %d, %.15f %s\n", mesh_name.c_str(),
-          (int)mesh.triangles.size(), stat.trial, stat.curve_length,
-          stat.seconds, stat.error.c_str());
+      fprintf(timings_file, "%s, %d, %d, %d, %.15f, %.15f, %.15f %s\n",
+          mesh_name.c_str(), (int)mesh.triangles.size(), stat.trial,
+          stat.curve_length, stat.seconds, stat.initial_guess_seconds,
+          stat.shortening_seconds, stat.error.c_str());
     }
     fclose(timings_file);
   }

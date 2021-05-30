@@ -77,6 +77,42 @@ inline shortest_path_stats test_shortest_path(const spline_mesh& mesh,
 
   return result;
 }
+
+inline shortest_path_stats test_control_polygon(
+    const spline_mesh& mesh, const vector<mesh_point>& points, bool flipout) {
+  auto result = shortest_path_stats{};
+  if (flipout) {
+    for (int i = 0; i < 3; i++) {
+      int  va       = mesh.triangles[points[i].face][i % 3];
+      int  vb       = mesh.triangles[points[i + 1].face][(i + 1) % 3];
+      auto polyline = create_path_from_points(
+          (ManifoldSurfaceMesh*)mesh.flipout_mesh.topology.get(),
+          (VertexPositionGeometry*)mesh.flipout_mesh.geometry.get(), va, vb);
+      result.initial_guess += polyline.second.initial_guess;
+      result.shortening += polyline.second.shortening;
+    }
+    return result;
+  }
+
+  for (int i = 0; i < 3; i++) {
+    auto start = points[i];
+    auto end   = points[i + 1];
+    auto path  = geodesic_path{};
+    auto t0    = simple_timer{};
+    auto strip = compute_strip(
+        mesh.dual_solver, mesh.triangles, mesh.positions, end, start);
+    strip = reduce_strip(mesh.dual_solver, strip);
+    result.initial_guess += elapsed_seconds(t0);
+
+    auto t1 = simple_timer{};
+    path    = shortest_path(
+        mesh.triangles, mesh.positions, mesh.adjacencies, start, end, strip);
+    result.shortening += elapsed_seconds(t1);
+  }
+
+  return result;
+}
+
 //
 // inline shortest_path_stats test_shortest_path(
 //    const spline_mesh& mesh, const mesh_point& start, const mesh_point& end) {

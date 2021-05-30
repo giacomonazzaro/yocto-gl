@@ -66,23 +66,20 @@ create_path_from_points(ManifoldSurfaceMesh* mesh,
   auto result =
       std::pair<std::unique_ptr<FlipEdgeNetwork>, flipout_path_stats>{};
 
-  
-    auto  t0        = simple_timer();
-    auto& edge_network = result.first;
-    edge_network       = FlipEdgeNetwork::constructFromDijkstraPath(
-        *mesh, *geometry, mesh->vertex(vertex_start), mesh->vertex(vertex_end));
-    result.second.initial_guess = elapsed_seconds(t0);
-  
+  auto  t0           = simple_timer();
+  auto& edge_network = result.first;
+  edge_network       = FlipEdgeNetwork::constructFromDijkstraPath(
+      *mesh, *geometry, mesh->vertex(vertex_start), mesh->vertex(vertex_end));
+  result.second.initial_guess = elapsed_seconds(t0);
 
-  
-    auto t1 = simple_timer();
-    if (edge_network == nullptr) {
-      return result;
-    }
-    edge_network->posGeom = geometry;
-    shorten_path(edge_network.get(), angleEPS, straightenAtMarked);
-    result.second.shortening = elapsed_seconds(t1);
-  
+  auto t1 = simple_timer();
+  if (edge_network == nullptr) {
+    return result;
+  }
+  edge_network->posGeom = geometry;
+  shorten_path(edge_network.get(), angleEPS, straightenAtMarked);
+  result.second.shortening = elapsed_seconds(t1);
+
   return result;
 }
 
