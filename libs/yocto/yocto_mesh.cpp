@@ -1113,7 +1113,10 @@ dual_geodesic_solver make_dual_geodesic_solver(const vector<vec3i>& _triangles,
     auto  p1     = (pos[1] + pos[2]) / 2;
     auto  l2     = length(pos[2] - pos[0]);
     auto  p2     = (pos[2] + pos[0]) / 2;
-    assert(l0 + l1 + l2);
+    if (l0 + l1 + l2 == 0) {
+      solver.centroids[face] = p0;
+      continue;
+    }
     solver.centroids[face] = (l0 * p0 + l1 * p1 + l2 * p2) / (l0 + l1 + l2);
   }
 
