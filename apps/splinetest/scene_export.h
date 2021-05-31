@@ -33,19 +33,14 @@ int add_shape(scene_model& scene, const scene_shape& shape_data) {
   return id;
 }
 
-int add_specular_material(scene_model& scene, const vec3f& color, int color_tex,
-    float roughness, int roughness_tex = -1, int normal_tex = -1,
-    float ior = 1.5, float specular = 1, int specular_tex = -1,
-    const vec3f& spectint = {1, 1, 1}, int spectint_tex = -1) {
-  auto  id               = (int)scene.materials.size();
-  auto& material         = scene.materials.emplace_back();
-  material.type          = scene_material_type::glossy;
-  material.color         = color;
-  material.color_tex     = color_tex;
-  material.roughness     = roughness;
-  material.roughness_tex = roughness_tex;
-  material.ior           = ior;
-  material.normal_tex    = normal_tex;
+int add_material(scene_model& scene, const vec3f& color, float roughness,
+    bool unlit = false) {
+  auto  id           = (int)scene.materials.size();
+  auto& material     = scene.materials.emplace_back();
+  material.type      = unlit ? scene_material_type::unlit
+                             : scene_material_type::glossy;
+  material.color     = color;
+  material.roughness = roughness;
   return id;
 }
 
@@ -138,8 +133,8 @@ void make_scene_floating(const spline_mesh& mesh, scene_model& scene,
 
   // mesh
   auto mesh_color = vec3f{0.8, 0.8, 0.8};
-  add_instance(scene, add_shape(scene, mesh),
-      add_specular_material(scene, mesh_color, -1, 0.5));
+  add_instance(
+      scene, add_shape(scene, mesh), add_material(scene, mesh_color, 0.5));
 
   auto edges = scene_shape{};
   for (auto& tr : mesh.triangles) {
@@ -155,10 +150,8 @@ void make_scene_floating(const spline_mesh& mesh, scene_model& scene,
       edges.positions.push_back(mesh.positions[b]);
     }
   }
-
   add_instance(scene, add_shape(scene, edges),
-      add_specular_material(scene, mesh_color * 0.75, -1, 0.0));
-  // scene.materials.back().opacity = 0.5;
+      add_material(scene, mesh_color * 0.75, 1.0, false));
 
   auto control_polygon = polyline_positions(mesh, points);
   // vector<mesh_point>{};
@@ -176,7 +169,7 @@ void make_scene_floating(const spline_mesh& mesh, scene_model& scene,
   add_instance(scene,
       add_shape(scene, polyline_shape(control_polygon, line_thickness / 3,
                            line_thickness / 3)),
-      add_specular_material(scene, {0, 0, 1}, -1, 0.2));
+      add_material(scene, {0, 0, 1}, 0.2));
 
   // curve
   // printf("%d: %f\n", trial, stat.seconds);
@@ -185,7 +178,7 @@ void make_scene_floating(const spline_mesh& mesh, scene_model& scene,
   add_instance(scene,
       add_shape(
           scene, polyline_shape(bezier_points, line_thickness, line_thickness)),
-      add_specular_material(scene, {1, 0, 0}, -1, 0.2));
+      add_material(scene, {1, 0, 0}, 0.2));
 
   // points
   auto points_positions = vector<vec3f>(points.size());
@@ -195,7 +188,7 @@ void make_scene_floating(const spline_mesh& mesh, scene_model& scene,
   }
   add_instance(scene,
       add_shape(scene, polyline_shape(points_positions, point_thickness, 0)),
-      add_specular_material(scene, {0, 0, 1}, -1, 0.2));
+      add_material(scene, {0, 0, 1}, 0.2));
 }
 
 // Save a path

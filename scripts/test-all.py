@@ -97,13 +97,14 @@ def render(dirname, output):
         msg = f'[{mesh_id}/{mesh_num}] {scene_name}'
         print(msg + ' ' * max(0, 78-len(msg)))
 
-        cmd = f'./bin/yscenetrace {scene_name}/scene.json -o {output}/{name}.png -s 1'
+        cmd = f'./bin/yscene render {scene_name}/scene.json --output {output}/{name}.png --samples 1'
         # print(cmd)
         retcode = subprocess.run(cmd, timeout=600, shell=True).returncode
 
 
 # algorithms = [('dc-uniform',4), ('dc-adaptive',4), ('lr-uniform',4), ('lr-adaptive',4)]
 algorithms = [('dc-uniform',4)]
+# algorithms = [('flipout',4)]
 
 def trace_all(dir):
     for algorithm, subdivisions in algorithms:

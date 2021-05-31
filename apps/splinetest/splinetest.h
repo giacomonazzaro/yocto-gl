@@ -143,6 +143,113 @@ inline vector<vec3f> eval_positions(const vector<vec3i>& triangles,
   return result;
 }
 
+// TODO(giacomo): put in yocto_mesh (explode params)
+static vec2f tangent_path_direction(const dual_geodesic_solver& solver,
+    const vector<vec3i>& triangles, const vector<vec3f>& positions,
+    const vector<vec3i>& adjacencies, const geodesic_path& path,
+    bool start = true) {
+  auto find = [](const vec3i& vec, int x) {
+    for (int i = 0; i < size(vec); i++)
+      if (vec[i] == x) return i;
+    return -1;
+  };
+
+  auto direction = vec2f{};
+
+  if (start) {
+    auto start_tr = triangle_coordinates(triangles, positions, path.start);
+
+    if (path.lerps.empty()) {
+      direction = interpolate_triangle(
+          start_tr[0], start_tr[1], start_tr[2], path.end.uv);
+    } else {
+      auto x    = path.lerps[0];
+      auto k    = find(adjacencies[path.strip[0]], path.strip[1]);
+      direction = lerp(start_tr[k], start_tr[(k + 1) % 3], x);
+    }
+  } else {
+    auto end_tr = triangle_coordinates(triangles, positions, path.end);
+    if (path.lerps.empty()) {
+      direction = interpolate_triangle(
+          end_tr[0], end_tr[1], end_tr[2], path.start.uv);
+    } else {
+      auto x = path.lerps.back();
+      auto k = find(
+          adjacencies[path.strip.rbegin()[0]], path.strip.rbegin()[1]);
+      direction = lerp(end_tr[k], end_tr[(k + 1) % 3], 1 - x);
+    }
+  }
+  return normalize(direction);
+}
+
+inline bool is_bezier_straight_enough(const geodesic_path& a,
+    const geodesic_path& b, const geodesic_path& c,
+    const dual_geodesic_solver& solver, const vector<vec3i>& triangles,
+    const vector<vec3f>& positions, const vector<vec3i>& adjacencies,
+    const spline_params& params) {
+  // TODO(giacomo): we don't need all positions!
+  // auto a_positions = path_positions(solver, triangles, positions,
+  // adjacencies,  a); auto b_positions = path_positions(solver, triangles,
+  // positions, adjacencies,  b); auto c_positions = path_positions(solver,
+  // triangles, positions, adjacencies,  c);
+
+  {
+    // On curve apex we may never reach straightess, so we check curve
+    // length.
+    auto pos  = array<vec3f, 4>{};
+    pos[0]    = eval_position(triangles, positions, a.start);
+    pos[1]    = eval_position(triangles, positions, b.start);
+    pos[2]    = eval_position(triangles, positions, c.start);
+    pos[3]    = eval_position(triangles, positions, c.end);
+    float len = 0;
+    for (int i = 0; i < 3; i++) {
+      len += length(pos[i] - pos[i + 1]);
+    }
+    if (len < params.min_curve_size) return true;
+  }
+
+  {
+    auto dir0 = tangent_path_direction(
+        solver, triangles, positions, adjacencies, a, false);  // end
+    auto dir1 = tangent_path_direction(
+        solver, triangles, positions, adjacencies, b, true);  // start
+    auto angle1 = cross(dir0, dir1);
+    if (fabs(angle1) > params.precision) {
+      // printf("a1: %f > %f\n", angle1, params.precision);
+      return false;
+    }
+  }
+
+  {
+    auto dir0 = tangent_path_direction(
+        solver, triangles, positions, adjacencies, b, false);  // end
+    auto dir1 = tangent_path_direction(
+        solver, triangles, positions, adjacencies, c, true);  // start
+    auto angle1 = cross(dir0, dir1);
+    if (fabs(angle1) > params.precision) {
+      // printf("a2: %f > %f\n", angle1, params.precision);
+      return false;
+    }
+  }
+
+  return true;
+}
+
+inline float tangent_space_angle(
+    const vec3f& a, const vec3f& b, const vec3f& c) {
+  return yocto::abs(1 - (dot(-normalize(a - b), normalize(c - b))));
+}
+
+inline float max_tangent_space_angle(const vector<vec3f>& positions) {
+  auto max_angle = 0.0f;
+  for (int i = 1; i < positions.size() - 1; i++) {
+    auto angle = tangent_space_angle(
+        positions[i - 1], positions[i], positions[i + 1]);
+    max_angle = yocto::max(max_angle, angle);
+  }
+  return max_angle;
+}
+
 inline vector<vec3f> bezier_curve(const spline_mesh& mesh,
     const vector<mesh_point>& control_points, const test_params& params) {
   if (params.flipout) {

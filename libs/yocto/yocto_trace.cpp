@@ -97,6 +97,8 @@ static vec3f eval_bsdfcos(const material_point& material, const vec3f& normal,
   } else if (material.type == scene_material_type::gltfpbr) {
     return eval_gltfpbr(material.color, material.ior, material.roughness,
         material.metallic, normal, outgoing, incoming);
+  } else if (material.type == scene_material_type::unlit) {
+    return material.color;
   } else {
     return {0, 0, 0};
   }
@@ -116,6 +118,8 @@ static vec3f eval_delta(const material_point& material, const vec3f& normal,
         material.color, material.ior, normal, outgoing, incoming);
   } else if (material.type == scene_material_type::volume) {
     return eval_passthrough(material.color, normal, outgoing, incoming);
+  } else if (material.type == scene_material_type::unlit) {
+    return material.color;
   } else {
     return {0, 0, 0};
   }
@@ -146,6 +150,8 @@ static vec3f sample_bsdfcos(const material_point& material, const vec3f& normal,
   } else if (material.type == scene_material_type::gltfpbr) {
     return sample_gltfpbr(material.color, material.ior, material.roughness,
         material.metallic, normal, outgoing, rnl, rn);
+  } else if (material.type == scene_material_type::unlit) {
+    return {0, 0, 0};
   } else {
     return {0, 0, 0};
   }
@@ -165,6 +171,8 @@ static vec3f sample_delta(const material_point& material, const vec3f& normal,
         material.color, material.ior, normal, outgoing, rnl);
   } else if (material.type == scene_material_type::volume) {
     return sample_passthrough(material.color, normal, outgoing);
+  } else if (material.type == scene_material_type::unlit) {
+    return {0, 0, 0};
   } else {
     return {0, 0, 0};
   }
@@ -195,6 +203,8 @@ static float sample_bsdfcos_pdf(const material_point& material,
   } else if (material.type == scene_material_type::gltfpbr) {
     return sample_gltfpbr_pdf(material.color, material.ior, material.roughness,
         material.metallic, normal, outgoing, incoming);
+  } else if (material.type == scene_material_type::unlit) {
+    return 0;
   } else {
     return 0;
   }

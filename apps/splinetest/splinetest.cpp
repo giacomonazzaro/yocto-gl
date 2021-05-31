@@ -210,12 +210,13 @@ int main(int argc, const char* argv[]) {
   progress = {0, trials};
 
   struct spline_stat {
-    int    curve_length;
-    int    trial;
-    double seconds;
-    double initial_guess_seconds;
-    double shortening_seconds;
-    string error;
+    int    curve_length          = 0;
+    int    trial                 = 0;
+    double seconds               = 0;
+    double initial_guess_seconds = 0;
+    double shortening_seconds    = 0;
+    float  max_angle             = 0;
+    string error                 = "";
   };
   int  num_passed   = 0;
   auto spline_stats = vector<spline_stat>{};
@@ -223,7 +224,8 @@ int main(int argc, const char* argv[]) {
   auto camera   = camera_settings{};
   camera.aspect = size(bbox).x / size(bbox).y;
 
-  auto success = false;
+  auto success       = false;
+  auto failed_a_test = 0;
   for (auto trial = 0; trial < trials; trial++) {
     if (selected_trial != -1 && trial != selected_trial) continue;
 
@@ -246,7 +248,8 @@ int main(int argc, const char* argv[]) {
       stat.initial_guess_seconds += path_stats.initial_guess;
       stat.shortening_seconds += path_stats.shortening;
     } catch (std::exception& e) {
-      stat.error = e.what();
+      stat.error    = e.what();
+      failed_a_test = 1;
       continue;
     }
 
@@ -257,7 +260,8 @@ int main(int argc, const char* argv[]) {
       stat.seconds      = double(elapsed_nanoseconds(bezier_timer)) / 1e9;
 
       stat.curve_length += (int)bezier.size();
-      stat.trial = trial;
+      stat.trial     = trial;
+      stat.max_angle = max_tangent_space_angle(bezier);
       num_passed += 1;
 
       auto control_polygon = polyline_positions(mesh, points);
@@ -301,17 +305,17 @@ int main(int argc, const char* argv[]) {
   if (timings_name.size() && !append_timings) {
     auto timings_file = fopen(timings_name.c_str(), "w");
     fprintf(timings_file,
-        "model,triangles,trial,num_points,bezier(s),initial_guess(s),shortening(s),error\n");
+        "model,triangles,trial,num_points,bezier(s),initial_guess(s),shortening(s),max_angle(rad),error\n");
     fclose(timings_file);
   }
 
   if (timings_name.size()) {
     auto timings_file = fopen(timings_name.c_str(), "a");
     for (auto& stat : spline_stats) {
-      fprintf(timings_file, "%s, %d, %d, %d, %.15f, %.15f, %.15f, %s\n",
+      fprintf(timings_file, "%s, %d, %d, %d, %.15f, %.15f, %.15f, %f, %s\n",
           mesh_name.c_str(), (int)mesh.triangles.size(), stat.trial,
           stat.curve_length, stat.seconds, stat.initial_guess_seconds,
-          stat.shortening_seconds, stat.error.c_str());
+          stat.shortening_seconds, stat.max_angle, stat.error.c_str());
     }
     fclose(timings_file);
   }
@@ -331,5 +335,5 @@ int main(int argc, const char* argv[]) {
   //   printf("avg_seconds: %f\n", avg_seconds);
   // }
 
-  return 0;
+  return failed_a_test;
 }

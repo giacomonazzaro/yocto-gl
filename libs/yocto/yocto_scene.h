@@ -103,14 +103,14 @@ struct scene_texture {
 // Material type
 enum struct scene_material_type {
   // clang-format off
-  matte, glossy, metallic, transparent, refractive, subsurface, volume, gltfpbr
+  matte, glossy, metallic, transparent, refractive, subsurface, volume, gltfpbr, unlit
   // clang-format on
 };
 
 // Enum labels
 inline const auto scene_material_names = std::vector<std::string>{"matte",
     "glossy", "metallic", "transparent", "refractive", "subsurface", "volume",
-    "gltfpbr"};
+    "gltfpbr", "unlit"};
 
 // Material for surfaces, lines and triangles.
 // For surfaces, uses a microfacet model with thin sheet transmission.
