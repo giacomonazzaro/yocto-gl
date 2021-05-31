@@ -47,6 +47,12 @@ struct shortest_path_stats {
   double shortening    = 0;
 };
 
+struct bezier_test {
+  vector<vec3f>  positions = {};
+  double seconds   = 0;
+  float  max_angle = 0;
+};
+
 inline shortest_path_stats test_shortest_path(const spline_mesh& mesh,
     const mesh_point& start, const mesh_point& end, bool flipout) {
   if (flipout) {
@@ -77,42 +83,6 @@ inline shortest_path_stats test_shortest_path(const spline_mesh& mesh,
 
   return result;
 }
-
-inline shortest_path_stats test_control_polygon(
-    const spline_mesh& mesh, const vector<mesh_point>& points, bool flipout) {
-  auto result = shortest_path_stats{};
-  if (flipout) {
-    for (int i = 0; i < 3; i++) {
-      int  va       = mesh.triangles[points[i].face][0];
-      int  vb       = mesh.triangles[points[i + 1].face][0];
-      auto polyline = create_path_from_points(
-          (ManifoldSurfaceMesh*)mesh.flipout_mesh.topology.get(),
-          (VertexPositionGeometry*)mesh.flipout_mesh.geometry.get(), va, vb);
-      result.initial_guess += polyline.second.initial_guess;
-      result.shortening += polyline.second.shortening;
-    }
-    return result;
-  }
-
-  for (int i = 0; i < 3; i++) {
-    auto start = points[i];
-    auto end   = points[i + 1];
-    auto path  = geodesic_path{};
-    auto t0    = simple_timer{};
-    auto strip = compute_strip(
-        mesh.dual_solver, mesh.triangles, mesh.positions, end, start);
-    strip = reduce_strip(mesh.dual_solver, strip);
-    result.initial_guess += elapsed_seconds(t0);
-
-    auto t1 = simple_timer{};
-    path    = shortest_path(
-        mesh.triangles, mesh.positions, mesh.adjacencies, start, end, strip);
-    result.shortening += elapsed_seconds(t1);
-  }
-
-  return result;
-}
-
 //
 // inline shortest_path_stats test_shortest_path(
 //    const spline_mesh& mesh, const mesh_point& start, const mesh_point& end) {
@@ -240,6 +210,37 @@ inline float tangent_space_angle(
   return yocto::abs(1 - (dot(-normalize(a - b), normalize(c - b))));
 }
 
+inline float tangent_space_angle(const spline_mesh& mesh, const mesh_point& a,
+    const mesh_point& b, const mesh_point& c) {
+  auto base_triangle = triangle_coordinates(mesh.triangles, mesh.positions, b);
+  auto get_coords    = [&](mesh_point p) -> vec2f {
+    if (p.face == b.face) {
+      return interpolate_triangle(
+          base_triangle[0], base_triangle[1], base_triangle[2], p.uv);
+    } else {
+      auto neigh_triangle = unfold_face(
+          mesh.triangles, mesh.positions, base_triangle, b.face, p.face);
+      return interpolate_triangle(
+          neigh_triangle[0], neigh_triangle[1], neigh_triangle[2], p.uv);
+    }
+  };
+
+  auto dir0 = get_coords(a);
+  auto dir1 = get_coords(c);
+  return yocto::abs(cross(dir0, dir1));
+}
+
+inline float max_tangent_space_angle(
+    const spline_mesh& mesh, const vector<mesh_point>& points) {
+  auto max_angle = 0.0f;
+  for (int i = 1; i < points.size() - 1; i++) {
+    auto angle = tangent_space_angle(
+        mesh, points[i - 1], points[i], points[i + 1]);
+    max_angle = yocto::max(max_angle, angle);
+  }
+  return max_angle;
+}
+
 inline float max_tangent_space_angle(const vector<vec3f>& positions) {
   auto max_angle = 0.0f;
   for (int i = 1; i < positions.size() - 1; i++) {
@@ -250,22 +251,74 @@ inline float max_tangent_space_angle(const vector<vec3f>& positions) {
   return max_angle;
 }
 
-inline vector<vec3f> bezier_curve(const spline_mesh& mesh,
-    const vector<mesh_point>& control_points, const test_params& params) {
-  if (params.flipout) {
-    auto vertices = vector<int>(4);
-    for (int i = 0; i < 4; i++) {
-      vertices[i] = mesh.triangles[control_points[i].face].x;
+inline shortest_path_stats test_control_polygon(
+    const spline_mesh& mesh, const vector<mesh_point>& points, bool flipout) {
+  auto result = shortest_path_stats{};
+  if (flipout) {
+    for (int i = 0; i < 3; i++) {
+      int  va       = mesh.triangles[points[i].face][0];
+      int  vb       = mesh.triangles[points[i + 1].face][0];
+      auto polyline = create_path_from_points(
+          (ManifoldSurfaceMesh*)mesh.flipout_mesh.topology.get(),
+          (VertexPositionGeometry*)mesh.flipout_mesh.geometry.get(), va, vb);
+      result.initial_guess += polyline.second.initial_guess;
+      result.shortening += polyline.second.shortening;
     }
-    auto bezier = make_polyline(mesh.flipout_mesh.topology.get(),
-        mesh.flipout_mesh.geometry.get(), vertices);
-    subdivide_bezier(bezier.get(), params.subdivisions);
-    return path_positions(bezier.get());
+    return result;
   }
 
-  auto points = compute_bezier_path(mesh.dual_solver, mesh.triangles,
-      mesh.positions, mesh.adjacencies, control_points, params);
-  return polyline_positions(mesh, points);
+  for (int i = 0; i < 3; i++) {
+    auto start = points[i];
+    auto end   = points[i + 1];
+    auto path  = geodesic_path{};
+    auto t0    = simple_timer{};
+    auto strip = compute_strip(
+        mesh.dual_solver, mesh.triangles, mesh.positions, end, start);
+    strip = reduce_strip(mesh.dual_solver, strip);
+    result.initial_guess += elapsed_seconds(t0);
+
+    auto t1 = simple_timer{};
+    path    = shortest_path(
+        mesh.triangles, mesh.positions, mesh.adjacencies, start, end, strip);
+    result.shortening += elapsed_seconds(t1);
+  }
+
+  return result;
+}
+
+inline std::unique_ptr<FlipEdgeNetwork> flipout_bezier_curve(
+    const spline_mesh& mesh, const vector<mesh_point>& control_points,
+    const test_params& params) {
+  auto vertices = vector<int>(4);
+  for (int i = 0; i < 4; i++) {
+    vertices[i] = mesh.triangles[control_points[i].face].x;
+  }
+  auto bezier = make_polyline(mesh.flipout_mesh.topology.get(),
+      mesh.flipout_mesh.geometry.get(), vertices);
+  subdivide_bezier(bezier.get(), params.subdivisions);
+  return bezier;
+}
+
+inline bezier_test test_bezier_curve(const spline_mesh& mesh,
+    const vector<mesh_point>& control_points, const test_params& params) {
+  auto result = bezier_test{};
+  if (!params.flipout) {
+    auto t0        = simple_timer{};
+    auto points    = compute_bezier_path(mesh.dual_solver, mesh.triangles,
+        mesh.positions, mesh.adjacencies, control_points, params);
+    result.seconds = elapsed_seconds(t0);
+
+    result.max_angle = max_tangent_space_angle(mesh, points);
+    result.positions = polyline_positions(mesh, points);
+  } else {
+    auto t0     = simple_timer{};
+    auto bezier = flipout_bezier_curve(
+        mesh, control_points, params);
+    result.seconds = elapsed_seconds(t0);
+
+    result.positions = path_positions(bezier.get());
+  }
+  return result;
 }
 
 inline vector<mesh_point> shortest_path(

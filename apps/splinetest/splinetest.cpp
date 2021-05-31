@@ -255,21 +255,19 @@ int main(int argc, const char* argv[]) {
 
     // Try computing bezier curve.
     try {
-      auto bezier_timer = simple_timer{};
-      auto bezier       = bezier_curve(mesh, points, params);
-      stat.seconds      = double(elapsed_nanoseconds(bezier_timer)) / 1e9;
-
-      stat.curve_length += (int)bezier.size();
-      stat.trial     = trial;
-      stat.max_angle = max_tangent_space_angle(bezier);
+      auto bezier       = test_bezier_curve(mesh, points, params);
+      stat.seconds      = bezier.seconds;
+      stat.max_angle    = bezier.max_angle;
+      stat.curve_length = (int)bezier.positions.size();
+      stat.trial        = trial;
       num_passed += 1;
 
       auto control_polygon = polyline_positions(mesh, points);
 
       // save scene
       if (scene_name.size() && !success) {
-        save_scene(scene_name, mesh_name, mesh, bezier, control_polygon, points,
-            camera);
+        save_scene(scene_name, mesh_name, mesh, bezier.positions,
+            control_polygon, points, camera);
         success = true;
       }
     } catch (std::exception& e) {
