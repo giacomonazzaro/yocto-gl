@@ -52,9 +52,19 @@
 
 // #define TESTS_MAY_FAIL
 
+#define SPLINE_DEBUG 1
 #define YOCTO_BEZIER_PRECISE 1
 #define YOCTO_BEZIER_DOUBLE 1
 #define UNFOLD_INTERSECTING_CIRCLES 0
+
+#if 1
+#include "ext/robin_hood.h"
+template <typename Key, typename Value>
+using hash_map = robin_hood::unordered_flat_map<Key, Value>;
+
+template <typename Key>
+using hash_set = robin_hood::unordered_flat_set<Key>;
+#endif
 
 // -----------------------------------------------------------------------------
 // USING DIRECTIVES
@@ -93,9 +103,13 @@ using namespace std::string_literals;
 // -----------------------------------------------------------------------------
 namespace yocto {
 
+#if SPLINE_DEBUG
 #define report_floating_point(x) \
   if (!isfinite(x))              \
     printf("%s, line %d: nan/infinity detected\n", __FILE__, __LINE__);
+#else
+#define report_floating_point(x) ;
+#endif
 
 // find a value in a vector or vecs
 static int find_in_vec(const vector<int>& vec, int x) {
@@ -577,6 +591,15 @@ static vector<pair<vec2d, vec2d>> make_funnel_portals_double(
   auto end = interpolate_triangle(
       coords.back()[0], coords.back()[1], coords.back()[2], to.uv);
   portals.back() = {end, end};
+
+#if SPLINE_DEBUG
+  for (auto& p : portals) {
+    report_floating_point(p.first.x);
+    report_floating_point(p.first.y);
+    report_floating_point(p.second.x);
+    report_floating_point(p.second.y);
+  }
+#endif
   return portals;
 }
 
@@ -2928,9 +2951,11 @@ bool path_check_strip(
   auto faces = unordered_set<int>{};
   faces.insert(strip[0]);
   for (auto i = 1; i < strip.size(); ++i) {
+#if SPLINE_DEBUG
     if (faces.count(strip[i]) != 0) {
-      // printf("strip[%d] (face: %d) appears twice\n", i, strip[i]);
+      printf("strip[%d] (face: %d) appears twice\n", i, strip[i]);
     }
+#endif
     faces.insert(strip[i]);
     assert(find_in_vec(adjacencies[strip[i - 1]], strip[i]) != -1);
     assert(find_in_vec(adjacencies[strip[i]], strip[i - 1]) != -1);
@@ -2938,27 +2963,30 @@ bool path_check_strip(
   return true;
 }
 
-static bool remove_loops_from_strip(vector<int>& strip) {
-  auto faces      = unordered_map<int, int>{};
-  faces[strip[0]] = 0;
-  auto result     = vector<int>(strip.size());
-  result[0]       = strip[0];
-  auto index      = 1;
-  bool found_loop = false;
+bool remove_loops_from_strip(vector<int>& strip) {
+  // Maps face to position in strip
+  static auto face_map = hash_map<int, int>{};
+  face_map.clear();
+  face_map.reserve(strip.size());
+  face_map[strip[0]] = 0;
+
+  static auto result = vector<int>();
+  // result.resize(strip.size());
+
+  // result[0]  = strip[0];
+  auto index = 1;
   for (auto i = 1; i < strip.size(); ++i) {
-    if (!found_loop && faces.count(strip[i]) != 0) {
-      // printf("[%s]: fixing %d (face %d)\n", __FUNCTION__, i, strip[i]);
-      auto t     = faces[strip[i]];
-      index      = t + 1;
-      found_loop = true;
+    if (face_map.count(strip[i]) != 0) {
+      auto t = face_map.at(strip[i]);
+      index  = t + 1;
       continue;
     }
-    faces[strip[i]] = i;
-    result[index++] = strip[i];
+    face_map[strip[i]] = i;
+    strip[index]       = strip[i];
+    index += 1;
   }
-  result.resize(index);
-  strip = result;
-  return found_loop;
+  // result.resize(index);
+  // std::swap(strip, result);
 }
 
 struct funnel_point {
@@ -3237,7 +3265,7 @@ bool check_point(const mesh_point& point) {
   return true;
 }
 
-static vector<int> fix_strip(const vector<vec3i>& adjacencies,
+vector<int> fix_strip(const vector<vec3i>& adjacencies,
     const vector<int>& strip, int index, int k, bool left) {
   assert(index < strip.size() - 1);
   assert(path_check_strip(adjacencies, strip));
@@ -3298,13 +3326,13 @@ static vector<int> fix_strip(const vector<vec3i>& adjacencies,
     result.push_back(strip[i]);
 
   //  assert(path_check_strip(adjacencies, result));
-  while (remove_loops_from_strip(result)) {
-  };
+  remove_loops_from_strip(result);
+
   assert(path_check_strip(adjacencies, result));
   return result;
 }
 
-static void straighten_path(geodesic_path& path, const vector<vec3i>& triangles,
+void straighten_path(geodesic_path& path, const vector<vec3i>& triangles,
     const vector<vec3f>& positions, const vector<vec3i>& adjacencies) {
   auto init_portals = unfold_funnel_portals_double(
       triangles, positions, path.strip, path.start, path.end);
@@ -4663,7 +4691,9 @@ static bool is_bezier_straight_enough(const geodesic_path& a,
         solver, triangles, positions, adjacencies, b, true);  // start
     auto angle1 = cross(dir0, dir1);
     if (fabs(angle1) > params.precision) {
+      // #if SPLINE_DEBUG
       // printf("a1: %f > %f\n", angle1, params.precision);
+      // #endif
       return false;
     }
   }
@@ -4675,7 +4705,9 @@ static bool is_bezier_straight_enough(const geodesic_path& a,
         solver, triangles, positions, adjacencies, c, true);  // start
     auto angle1 = cross(dir0, dir1);
     if (fabs(angle1) > params.precision) {
+      // #if SPLINE_DEBUG
       // printf("a2: %f > %f\n", angle1, params.precision);
+      // #endif
       return false;
     }
   }

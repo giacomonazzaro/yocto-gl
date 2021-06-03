@@ -161,10 +161,6 @@ int main(int argc, const char* argv[]) {
   auto ioerror = ""s;
   if (!load_shape(mesh_name, mesh, ioerror)) print_fatal(ioerror);
   mesh.adjacencies = face_adjacencies(mesh.triangles);
-  //  stats["load_time"] = elapsed_nanoseconds(load_timer);
-  //  stats["filename"]  = mesh_name;
-  //  stats["triangles"] = mesh.triangles.size();
-  //  stats["vertices"]  = mesh.positions.size();
 
   // check if valid
   if (validate) {
@@ -176,18 +172,21 @@ int main(int argc, const char* argv[]) {
       //      save_stats(stats_name, stats);
       print_fatal("validation error: " + error);
     }
-  } else {
-    //    stats["valid"] = true;
   }
 
-  // transform
-  print_progress("rescale mesh", progress.x++, progress.y);
-  auto rescale_timer = simple_timer{};
-  auto bbox          = invalidb3f;
-  for (auto& position : mesh.positions) bbox = merge(bbox, position);
-  for (auto& position : mesh.positions)
-    position = (position - center(bbox)) / max(size(bbox));
-  //  stats["rescale_time"] = elapsed_nanoseconds(rescale_timer);
+  for (auto& p : mesh.positions) mesh.bbox = merge(mesh.bbox, p);
+  for (auto& p : mesh.positions) {
+    p = (p - center(mesh.bbox)) / max(size(mesh.bbox));
+  }
+
+  for (auto& [a, b, c] : mesh.triangles) {
+    auto l0              = length(mesh.positions[a] - mesh.positions[b]);
+    auto l1              = length(mesh.positions[a] - mesh.positions[c]);
+    auto l2              = length(mesh.positions[b] - mesh.positions[c]);
+    mesh.max_edge_length = yocto::max(l0, mesh.max_edge_length);
+    mesh.max_edge_length = yocto::max(l1, mesh.max_edge_length);
+    mesh.max_edge_length = yocto::max(l2, mesh.max_edge_length);
+  }
 
   if (params.flipout) {
     mesh.flipout_mesh = flipout::make_flipout_mesh(
@@ -210,19 +209,20 @@ int main(int argc, const char* argv[]) {
   progress = {0, trials};
 
   struct spline_stat {
-    int    curve_length          = 0;
-    int    trial                 = 0;
-    double seconds               = 0;
-    double initial_guess_seconds = 0;
-    double shortening_seconds    = 0;
-    float  max_angle             = 0;
-    string error                 = "";
+    int    curve_length           = 0;
+    int    trial                  = 0;
+    double seconds                = 0;
+    double initial_guess_seconds  = 0;
+    double shortening_seconds     = 0;
+    float  max_angle              = 0;
+    float  max_segment_edge_ratio = 0;
+    string error                  = "";
   };
   int  num_passed   = 0;
   auto spline_stats = vector<spline_stat>{};
 
   auto camera   = camera_settings{};
-  camera.aspect = size(bbox).x / size(bbox).y;
+  camera.aspect = size(mesh.bbox).x / size(mesh.bbox).y;
 
   auto success       = false;
   auto failed_a_test = 0;
@@ -236,8 +236,9 @@ int main(int argc, const char* argv[]) {
       hash = stoi(path_basename(mesh_name), &dummy);
     } catch (std::exception e) {
     }
-    auto points = sample_points(mesh.triangles, mesh.positions, bbox, mesh.bvh,
-        camera.from, camera.to, camera.lens, camera.aspect, trial + hash);
+    auto points = sample_points(mesh.triangles, mesh.positions, mesh.bbox,
+        mesh.bvh, camera.from, camera.to, camera.lens, camera.aspect,
+        trial + hash);
     if (params.flipout) {
       for (auto& p : points) p.uv = {0, 0};
     }
@@ -255,11 +256,13 @@ int main(int argc, const char* argv[]) {
 
     // Try computing bezier curve.
     try {
-      auto bezier       = test_bezier_curve(mesh, points, params);
-      stat.seconds      = bezier.seconds;
-      stat.max_angle    = bezier.max_angle;
-      stat.curve_length = (int)bezier.positions.size();
-      stat.trial        = trial;
+      auto bezier                 = test_bezier_curve(mesh, points, params);
+      stat.seconds                = bezier.seconds;
+      stat.max_angle              = bezier.max_angle;
+      stat.curve_length           = (int)bezier.positions.size();
+      stat.max_segment_edge_ratio = bezier.max_segment_length /
+                                    mesh.max_edge_length;
+      stat.trial = trial;
       num_passed += 1;
 
       auto control_polygon = polyline_positions(mesh, points);
@@ -303,17 +306,18 @@ int main(int argc, const char* argv[]) {
   if (timings_name.size() && !append_timings) {
     auto timings_file = fopen(timings_name.c_str(), "w");
     fprintf(timings_file,
-        "model,triangles,trial,num_points,bezier(s),initial_guess(s),shortening(s),max_angle(rad),error\n");
+        "model,triangles,trial,num_points,bezier(s),initial_guess(s),shortening(s),max_angle(rad),max_segment_edge_ratio,error\n");
     fclose(timings_file);
   }
 
   if (timings_name.size()) {
     auto timings_file = fopen(timings_name.c_str(), "a");
     for (auto& stat : spline_stats) {
-      fprintf(timings_file, "%s, %d, %d, %d, %.15f, %.15f, %.15f, %f, %s\n",
+      fprintf(timings_file, "%s, %d, %d, %d, %.15f, %.15f, %.15f, %f, %f, %s\n",
           mesh_name.c_str(), (int)mesh.triangles.size(), stat.trial,
           stat.curve_length, stat.seconds, stat.initial_guess_seconds,
-          stat.shortening_seconds, stat.max_angle, stat.error.c_str());
+          stat.shortening_seconds, stat.max_angle, stat.max_segment_edge_ratio,
+          stat.error.c_str());
     }
     fclose(timings_file);
   }

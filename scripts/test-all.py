@@ -50,7 +50,7 @@ def trace(dirname, output, algorithm, subdivisions):
         if append == '': append = '--append-timings'
         
         try:
-            retcode = subprocess.run(cmd, timeout=60, shell=True).returncode
+            retcode = subprocess.run(cmd, timeout=300, shell=True).returncode
             if retcode < 0:
                 handle_error('app_terminated', result, mesh_name, stats_name)
             elif retcode > 0:
@@ -62,9 +62,8 @@ def trace(dirname, output, algorithm, subdivisions):
         except subprocess.TimeoutExpired:
             handle_error('app_timeout', result, mesh_name, stats_name)
             
-    
-    with open(f'{output}/trace-result.json', 'wt') as f:
-        json.dump(result, f, indent=2)
+        with open(f'{output}/trace-result.json', 'wt') as f:
+            json.dump(result, f, indent=2)
 
     # timings = pd.read_csv(f'{output}/timings.csv')
     # plt.scatter(timings['length'], timings['seconds'])
