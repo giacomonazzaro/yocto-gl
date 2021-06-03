@@ -2963,30 +2963,60 @@ bool path_check_strip(
   return true;
 }
 
-bool remove_loops_from_strip(vector<int>& strip) {
-  // Maps face to position in strip
-  static auto face_map = hash_map<int, int>{};
-  face_map.clear();
-  face_map.reserve(strip.size());
-  face_map[strip[0]] = 0;
+// bool remove_loops_from_strip(vector<int>& strip) {
+//   // Maps face to position in strip
+//   static auto face_map = hash_map<int, int>{};
+//   face_map.clear();
+//   face_map.reserve(strip.size());
+//   face_map[strip[0]]     = 0;
+//   bool removed_some_loop = false;
 
-  static auto result = vector<int>();
-  // result.resize(strip.size());
+//   // static auto result = vector<int>();
+//   // result.resize(strip.size());
 
-  // result[0]  = strip[0];
-  auto index = 1;
+//   // result[0]  = strip[0];
+//   auto index = 1;
+//   for (auto i = 1; i < strip.size(); ++i) {
+//     if (!removed_some_loop)
+//       if (auto it = face_map.find(strip[i]); it != face_map.end()) {
+//         auto t            = it->second;
+//         index             = t + 1;
+//         removed_some_loop = true;
+//         continue;
+//       }
+//     face_map[strip[i]] = i;
+//     strip[index]       = strip[i];
+//     index += 1;
+//   }
+//   return removed_some_loop;
+// }
+
+static bool remove_loops_from_strip(vector<int>& strip) {
+  static auto faces = hash_map<int, int>{};
+  faces.clear();
+  faces.reserve(strip.size());
+
+  faces[strip[0]] = 0;
+  // auto result     = vector<int>(strip.size());
+  // result[0]       = strip[0];
+  auto& result     = strip;
+  auto  index      = 1;
+  bool  found_loop = false;
+
   for (auto i = 1; i < strip.size(); ++i) {
-    if (face_map.count(strip[i]) != 0) {
-      auto t = face_map.at(strip[i]);
-      index  = t + 1;
+    if (!found_loop && faces.count(strip[i]) != 0) {
+      // printf("[%s]: fixing %d (face %d)\n", __FUNCTION__, i, strip[i]);
+      auto t     = faces[strip[i]];
+      index      = t + 1;
+      found_loop = true;
       continue;
     }
-    face_map[strip[i]] = i;
-    strip[index]       = strip[i];
-    index += 1;
+    faces[strip[i]] = i;
+    result[index++] = strip[i];
   }
-  // result.resize(index);
-  // std::swap(strip, result);
+  result.resize(index);
+  // strip = result;
+  return found_loop;
 }
 
 struct funnel_point {
@@ -3326,7 +3356,9 @@ vector<int> fix_strip(const vector<vec3i>& adjacencies,
     result.push_back(strip[i]);
 
   //  assert(path_check_strip(adjacencies, result));
-  remove_loops_from_strip(result);
+  while (remove_loops_from_strip(result)) {
+  }
+  // remove_loops_from_strip(result);
 
   assert(path_check_strip(adjacencies, result));
   return result;
