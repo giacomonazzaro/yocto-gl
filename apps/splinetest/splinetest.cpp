@@ -174,19 +174,7 @@ int main(int argc, const char* argv[]) {
     }
   }
 
-  for (auto& p : mesh.positions) mesh.bbox = merge(mesh.bbox, p);
-  for (auto& p : mesh.positions) {
-    p = (p - center(mesh.bbox)) / max(size(mesh.bbox));
-  }
-
-  for (auto& [a, b, c] : mesh.triangles) {
-    auto l0              = length(mesh.positions[a] - mesh.positions[b]);
-    auto l1              = length(mesh.positions[a] - mesh.positions[c]);
-    auto l2              = length(mesh.positions[b] - mesh.positions[c]);
-    mesh.max_edge_length = yocto::max(l0, mesh.max_edge_length);
-    mesh.max_edge_length = yocto::max(l1, mesh.max_edge_length);
-    mesh.max_edge_length = yocto::max(l2, mesh.max_edge_length);
-  }
+  init_mesh(mesh);
 
   if (params.flipout) {
     mesh.flipout_mesh = flipout::make_flipout_mesh(

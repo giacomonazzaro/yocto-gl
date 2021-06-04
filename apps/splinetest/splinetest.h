@@ -3,6 +3,7 @@
 #include <yocto/yocto_mesh.h>
 #include <yocto/yocto_sampling.h>
 #include <yocto/yocto_scene.h>
+#include <yocto/yocto_sceneio.h>
 #include <yocto/yocto_shape.h>
 
 #include "ext/flipout/flipout.h"
@@ -22,13 +23,13 @@ struct test_params : spline_params {
   bool flipout = false;
 };
 
-vector<mesh_point> shortest_path(
+inline vector<mesh_point> shortest_path(
     const spline_mesh& mesh, const mesh_point& start, const mesh_point& end) {
   return compute_shortest_path(mesh.dual_solver, mesh.triangles, mesh.positions,
       mesh.adjacencies, start, end);
 }
 
-vector<vec3f> polyline_positions(
+inline vector<vec3f> polyline_positions(
     const spline_mesh& mesh, const vector<mesh_point>& control_points) {
   auto points = vector<mesh_point>{};
   for (int i = 0; i < control_points.size() - 1; i++) {
@@ -56,7 +57,7 @@ struct bezier_test {
   float         max_segment_length = 0;
 };
 
-shortest_path_stats test_shortest_path(const spline_mesh& mesh,
+inline shortest_path_stats test_shortest_path(const spline_mesh& mesh,
     const mesh_point& start, const mesh_point& end, bool flipout) {
   if (flipout) {
     //    auto vertices = vector<int>(4);
@@ -107,7 +108,7 @@ shortest_path_stats test_shortest_path(const spline_mesh& mesh,
 //  // .points;
 //}
 
-vector<vec3f> eval_positions(const vector<vec3i>& triangles,
+inline vector<vec3f> eval_positions(const vector<vec3i>& triangles,
     const vector<vec3f>& positions, const vector<mesh_point>& points) {
   auto result = vector<vec3f>(points.size());
   for (int i = 0; i < points.size(); i++) {
@@ -117,7 +118,7 @@ vector<vec3f> eval_positions(const vector<vec3i>& triangles,
 }
 
 // TODO(giacomo): put in yocto_mesh (explode params)
-static vec2f tangent_path_direction(const dual_geodesic_solver& solver,
+inline vec2f tangent_path_direction(const dual_geodesic_solver& solver,
     const vector<vec3i>& triangles, const vector<vec3f>& positions,
     const vector<vec3i>& adjacencies, const geodesic_path& path,
     bool start = true) {
@@ -155,10 +156,11 @@ static vec2f tangent_path_direction(const dual_geodesic_solver& solver,
   return normalize(direction);
 }
 
-bool is_bezier_straight_enough(const geodesic_path& a, const geodesic_path& b,
-    const geodesic_path& c, const dual_geodesic_solver& solver,
-    const vector<vec3i>& triangles, const vector<vec3f>& positions,
-    const vector<vec3i>& adjacencies, const spline_params& params) {
+inline bool is_bezier_straight_enough(const geodesic_path& a,
+    const geodesic_path& b, const geodesic_path& c,
+    const dual_geodesic_solver& solver, const vector<vec3i>& triangles,
+    const vector<vec3f>& positions, const vector<vec3i>& adjacencies,
+    const spline_params& params) {
   // TODO(giacomo): we don't need all positions!
   // auto a_positions = path_positions(solver, triangles, positions,
   // adjacencies,  a); auto b_positions = path_positions(solver, triangles,
@@ -207,11 +209,12 @@ bool is_bezier_straight_enough(const geodesic_path& a, const geodesic_path& b,
   return true;
 }
 
-float tangent_space_angle(const vec3f& a, const vec3f& b, const vec3f& c) {
+inline float tangent_space_angle(
+    const vec3f& a, const vec3f& b, const vec3f& c) {
   return yocto::abs(1 - (dot(-normalize(a - b), normalize(c - b))));
 }
 
-float tangent_space_angle(const spline_mesh& mesh, const mesh_point& a,
+inline float tangent_space_angle(const spline_mesh& mesh, const mesh_point& a,
     const mesh_point& b, const mesh_point& c) {
   auto base_triangle = triangle_coordinates(mesh.triangles, mesh.positions, b);
   auto get_coords    = [&](mesh_point p) -> vec2f {
@@ -231,7 +234,7 @@ float tangent_space_angle(const spline_mesh& mesh, const mesh_point& a,
   return yocto::abs(cross(dir0, dir1));
 }
 
-float max_tangent_space_angle(
+inline float max_tangent_space_angle(
     const spline_mesh& mesh, const vector<mesh_point>& points) {
   auto max_angle = 0.0f;
   for (int i = 1; i < points.size() - 1; i++) {
@@ -242,7 +245,7 @@ float max_tangent_space_angle(
   return max_angle;
 }
 
-float max_tangent_space_angle(const vector<vec3f>& positions) {
+inline float max_tangent_space_angle(const vector<vec3f>& positions) {
   auto max_angle = 0.0f;
   for (int i = 1; i < positions.size() - 1; i++) {
     auto angle = tangent_space_angle(
@@ -252,7 +255,7 @@ float max_tangent_space_angle(const vector<vec3f>& positions) {
   return max_angle;
 }
 
-shortest_path_stats test_control_polygon(
+inline shortest_path_stats test_control_polygon(
     const spline_mesh& mesh, const vector<mesh_point>& points, bool flipout) {
   auto result = shortest_path_stats{};
   if (flipout) {
@@ -287,8 +290,9 @@ shortest_path_stats test_control_polygon(
   return result;
 }
 
-std::unique_ptr<FlipEdgeNetwork> flipout_bezier_curve(const spline_mesh& mesh,
-    const vector<mesh_point>& control_points, const test_params& params) {
+inline std::unique_ptr<FlipEdgeNetwork> flipout_bezier_curve(
+    const spline_mesh& mesh, const vector<mesh_point>& control_points,
+    const test_params& params) {
   auto vertices = vector<int>(4);
   for (int i = 0; i < 4; i++) {
     vertices[i] = mesh.triangles[control_points[i].face].x;
@@ -299,7 +303,7 @@ std::unique_ptr<FlipEdgeNetwork> flipout_bezier_curve(const spline_mesh& mesh,
   return bezier;
 }
 
-bezier_test test_bezier_curve(const spline_mesh& mesh,
+inline bezier_test test_bezier_curve(const spline_mesh& mesh,
     const vector<mesh_point>& control_points, const test_params& params) {
   auto result = bezier_test{};
   if (!params.flipout) {
@@ -325,7 +329,7 @@ bezier_test test_bezier_curve(const spline_mesh& mesh,
   return result;
 }
 
-vector<mesh_point> shortest_path(
+inline vector<mesh_point> shortest_path(
     const spline_mesh& mesh, const vector<mesh_point>& points) {
   // geodesic path
   auto path = vector<mesh_point>{};
@@ -337,7 +341,7 @@ vector<mesh_point> shortest_path(
   return path;
 }
 
-pair<bool, string> validate_mesh(
+inline pair<bool, string> validate_mesh(
     const spline_mesh& mesh, float connection_threshold = 1) {
   // check for connected components
   auto visited     = vector<bool>(mesh.adjacencies.size(), false);
@@ -393,7 +397,7 @@ pair<bool, string> validate_mesh(
   return {true, ""};
 }
 
-vector<mesh_point> sample_points(const vector<vec3i>& triangles,
+inline vector<mesh_point> sample_points(const vector<vec3i>& triangles,
     const vector<vec3f>& positions, const bbox3f& bbox, const shape_bvh& bvh,
     const vec3f& camera_from, const vec3f& camera_to, float camera_lens,
     float camera_aspect, uint64_t trial, int num_points = 4,
@@ -434,4 +438,30 @@ vector<mesh_point> sample_points(const vector<vec3i>& triangles,
     points.push_back({mesh_point{triangle, uv}});
   }
   return points;
+}
+
+inline void init_mesh(spline_mesh& mesh) {
+  mesh.adjacencies = face_adjacencies(mesh.triangles);
+
+  for (auto& p : mesh.positions) mesh.bbox = merge(mesh.bbox, p);
+  auto s = max(size(mesh.bbox));
+  auto c = center(mesh.bbox);
+  for (auto& p : mesh.positions) p = (p - c) / s;
+
+  mesh.bbox.max = (mesh.bbox.max - c) / s;
+  mesh.bbox.min = (mesh.bbox.min - c) / s;
+
+  for (auto& [a, b, c] : mesh.triangles) {
+    auto l0              = length(mesh.positions[a] - mesh.positions[b]);
+    auto l1              = length(mesh.positions[a] - mesh.positions[c]);
+    auto l2              = length(mesh.positions[b] - mesh.positions[c]);
+    mesh.max_edge_length = yocto::max(l0, mesh.max_edge_length);
+    mesh.max_edge_length = yocto::max(l1, mesh.max_edge_length);
+    mesh.max_edge_length = yocto::max(l2, mesh.max_edge_length);
+  }
+
+  mesh.bvh = make_triangles_bvh(mesh.triangles, mesh.positions, {});
+
+  mesh.dual_solver = make_dual_geodesic_solver(
+      mesh.triangles, mesh.positions, 0.05);
 }
