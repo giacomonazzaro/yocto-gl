@@ -5,6 +5,7 @@
 #include <yocto/yocto_sampling.h>
 #include <yocto/yocto_shape.h>
 
+#include "scene_export.h"
 #include "splineio.h"
 using namespace yocto;
 
@@ -14,7 +15,7 @@ int main(int argc, const char* argv[]) {
   auto max_edge_length = 0.0f;
   auto timings_name    = ""s;
   auto append_timings  = false;
-  auto output_name     = ""s;
+  auto scene_name      = ""s;
   auto mesh_name       = "mesh.ply"s;
   auto test_name       = "mesh.ply"s;
   auto algorithm       = "dc-uniform"s;
@@ -29,7 +30,7 @@ int main(int argc, const char* argv[]) {
 
   // Filenames for outputs. No output if empty.
   add_option(cli, "test", test_name, "test path");
-  add_option(cli, "output", output_name, "output name");
+  add_option(cli, "scene", scene_name, "scene name");
 
   add_option(cli, "timings", timings_name, "output timings");
   add_option(cli, "append-timings", append_timings, "append timings");
@@ -56,21 +57,22 @@ int main(int argc, const char* argv[]) {
   auto path_name      = ""s;
   auto stats_name     = ""s;
 
-  if (output_name.size()) {
-    string ioerror;
-    if (!make_directory(output_name, ioerror)) {
-      print_fatal(ioerror);
-    }
-    stats_name = path_join(
-        path_join(output_name, "stats"), model_basename + ".json");
-    path_name = path_join(
-        path_join(output_name, "paths"), model_basename + ".ply");
-    // scene_name   = path_join(path_join(output_name, "scenes"),
-    // model_basename) +;
-    timings_name = path_join(output_name, "timings.csv");
-  }
+  //  if (scene_name.size()) {
+  //    string ioerror;
+  //    if (!make_directory(scene_name, ioerror)) {
+  //      print_fatal(ioerror);
+  //    }
+  //    stats_name = path_join(
+  //        path_join(scene_name, "stats"), model_basename + ".json");
+  //    path_name = path_join(
+  //        path_join(scene_name, "paths"), model_basename + ".ply");
+  //    // scene_name   = path_join(path_join(scene_name, "scenes"),
+  //    // model_basename) +;
+  //    timings_name = path_join(scene_name, "timings.csv");
+  //  }
 
   // mesh data
+
   auto mesh     = spline_mesh{};
   auto progress = vec2i{0, 5};
 
@@ -81,15 +83,14 @@ int main(int argc, const char* argv[]) {
 
   init_mesh(mesh);
 
-  auto control_points = vector<mesh_point>{};
-  auto error          = string{};
-  if (!load_bezier_params(test_name, control_points, params, error)) {
+  auto error       = string{};
+  auto spline_test = load_test(test_name, error);
+  if (error.size()) {
     printf("error: %s\n", error.c_str());
   }
 
-    
-    auto xxx = test_params{};
-  auto stats = test_bezier_curve(mesh, control_points, xxx);
+  auto xxx   = test_params{};
+  auto stats = test_bezier_curve(mesh, spline_test.control_points, xxx);
   printf("seconds: %lf, max_angle: %f\n", stats.seconds, stats.max_angle);
 
   // done
@@ -98,22 +99,25 @@ int main(int argc, const char* argv[]) {
   // output timings
   if (timings_name.size() && !append_timings) {
     auto timings_file = fopen(timings_name.c_str(), "w");
-    fprintf(timings_file,
-        "model,triangles,trial,num_points,bezier(s),initial_guess(s),shortening(s),max_angle(rad),max_segment_edge_ratio,error\n");
+    fprintf(
+        timings_file, "model,triangles,num_points,bezier(s),max_angle(rad)\n");
     fclose(timings_file);
   }
 
   if (timings_name.size()) {
     auto timings_file = fopen(timings_name.c_str(), "a");
-    //    for (auto& stat : spline_stats) {
-    //      fprintf(timings_file, "%s, %d, %d, %d, %.15f, %.15f, %.15f, %f,
-    //      %f, %s\n",
-    //          mesh_name.c_str(), (int)mesh.triangles.size(), stat.trial,
-    //          stat.curve_length, stat.seconds, stat.initial_guess_seconds,
-    //          stat.shortening_seconds, stat.max_angle,
-    //          stat.max_segment_edge_ratio, stat.error.c_str());
-    //    }
+    fprintf(timings_file, "%s, %d, %d, %.15f, %f\n", mesh_name.c_str(),
+        (int)mesh.triangles.size(), (int)stats.positions.size(), stats.seconds,
+        stats.max_angle);
     fclose(timings_file);
+  }
+
+  if (scene_name.size()) {
+    auto curve           = stats.positions;
+    auto control_polygon = polyline_positions(mesh, spline_test.control_points);
+    auto control_points  = spline_test.control_points;
+    save_scene(scene_name, mesh_name, mesh, curve, control_polygon,
+        control_points, spline_test.camera);
   }
 
   // else {

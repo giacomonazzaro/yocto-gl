@@ -40,39 +40,6 @@
 
 using namespace yocto;
 
-// default camera
-struct camera_settings {
-  vec3f from   = {0, 0, 3};
-  vec3f to     = {0, 0, 0};
-  float lens   = 0.100f;
-  float aspect = 0;
-};
-
-void save_scene(const string& scene_name, const string& mesh_name,
-    const spline_mesh& mesh, const vector<vec3f>& bezier,
-    const vector<vec3f>& control_polygon, const vector<mesh_point>& points,
-    const camera_settings& camera) {
-  string ioerror;
-  if (!make_directory(path_dirname(scene_name), ioerror)) print_fatal(ioerror);
-  if (!make_directory(path_join(path_dirname(scene_name), "shapes"), ioerror))
-    print_fatal(ioerror);
-  if (!make_directory(path_join(path_dirname(scene_name), "textures"), ioerror))
-    print_fatal(ioerror);
-
-  //  print_progress("save scene", progress.x++, progress.y++);
-  auto scene_timer = simple_timer{};
-  auto scene       = scene_model{};
-
-  make_scene_floating(mesh, scene, camera.from, camera.to, camera.lens,
-      camera.aspect, points, control_polygon, bezier);
-
-  if (!save_scene(scene_name, scene, ioerror)) print_fatal(ioerror);
-  // stats["scene"]             =
-  //        json_value::object(); stats["scene"]["time"]     =
-  //        elapsed_nanoseconds(scene_timer); stats["scene"]["filename"] =
-  //        scene_name;
-}
-
 // -----------------------------------------------------------------------------
 // MAIN FUNCTION
 // -----------------------------------------------------------------------------
@@ -209,7 +176,9 @@ int main(int argc, const char* argv[]) {
   int  num_passed   = 0;
   auto spline_stats = vector<spline_stat>{};
 
-  auto camera   = camera_settings{};
+  auto camera   = scene_camera{};
+  camera.lens   = 0.100f;
+  camera.frame  = lookat_frame({0, 0, 3}, {0, 0, 0}, {0, 1, 0});
   camera.aspect = size(mesh.bbox).x / size(mesh.bbox).y;
 
   auto success       = false;
@@ -225,8 +194,7 @@ int main(int argc, const char* argv[]) {
     } catch (std::exception e) {
     }
     auto points = sample_points(mesh.triangles, mesh.positions, mesh.bbox,
-        mesh.bvh, camera.from, camera.to, camera.lens, camera.aspect,
-        trial + hash);
+        mesh.bvh, camera, trial + hash);
     if (params.flipout) {
       for (auto& p : points) p.uv = {0, 0};
     }

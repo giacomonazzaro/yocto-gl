@@ -31,6 +31,7 @@ inline vector<mesh_point> shortest_path(
 
 inline vector<vec3f> polyline_positions(
     const spline_mesh& mesh, const vector<mesh_point>& control_points) {
+    if(control_points.empty()) return {};
   auto points = vector<mesh_point>{};
   for (int i = 0; i < control_points.size() - 1; i++) {
     auto a  = control_points[i];
@@ -399,8 +400,7 @@ inline pair<bool, string> validate_mesh(
 
 inline vector<mesh_point> sample_points(const vector<vec3i>& triangles,
     const vector<vec3f>& positions, const bbox3f& bbox, const shape_bvh& bvh,
-    const vec3f& camera_from, const vec3f& camera_to, float camera_lens,
-    float camera_aspect, uint64_t trial, int num_points = 4,
+    const scene_camera& camera, uint64_t trial, int num_points = 4,
     int ray_trials = 10000) {
   // init data
   auto points  = vector<mesh_point>{};
@@ -419,8 +419,7 @@ inline vector<mesh_point> sample_points(const vector<vec3i>& triangles,
       uv = uv * 0.5 + vec2f{0.5, 0.5};
     }
 
-    auto ray  = camera_ray(lookat_frame(camera_from, camera_to, {0, 1, 0}),
-        camera_lens, camera_aspect, 0.036f, uv);
+    auto ray = camera_ray(camera.frame, camera.lens, camera.aspect, 0.036f, uv);
     auto isec = intersect_triangles_bvh(bvh, triangles, positions, ray);
     if (!isec.hit) continue;
     if (isec.element < 0 || isec.element > triangles.size()) continue;

@@ -944,7 +944,7 @@ bool load_shape(const string& filename, scene_shape& shape, string& error,
   };
   auto shape_error = [filename, &error]() {
     error = filename + ": empty shape";
-    return false;
+    return true;
   };
   auto preset_error = [filename, &error]() {
     error = filename + ": " + error;
@@ -1010,7 +1010,7 @@ bool save_shape(const string& filename, const scene_shape& shape, string& error,
   };
   auto shape_error = [filename, &error]() {
     error = filename + ": empty shape";
-    return false;
+    return true;
   };
   auto line_error = [filename, &error]() {
     error = filename + ": unsupported lines";
@@ -1124,7 +1124,7 @@ bool load_fvshape(const string& filename, scene_fvshape& shape, string& error,
   };
   auto shape_error = [filename, &error]() {
     error = filename + ": empty shape";
-    return false;
+    return true;
   };
   auto preset_error = [filename, &error]() {
     error = filename + ": " + error;
@@ -1186,7 +1186,7 @@ bool save_fvshape(const string& filename, const scene_fvshape& shape,
   };
   auto shape_error = [filename, &error]() {
     error = filename + ": empty shape";
-    return false;
+    return true;
   };
 
   auto ext = path_extension(filename);
@@ -3430,7 +3430,7 @@ static bool load_obj_scene(const string& filename, scene_model& scene,
     string& error, bool noparallel) {
   auto shape_error = [filename, &error]() {
     error = filename + ": empty shape";
-    return false;
+    return true;
   };
   auto material_error = [filename, &error](const string& name) {
     error = filename + ": missing material " + name;
@@ -3569,7 +3569,7 @@ static bool save_obj_scene(const string& filename, const scene_model& scene,
     string& error, bool noparallel) {
   auto shape_error = [filename, &error]() {
     error = filename + ": empty shape";
-    return false;
+    return true;
   };
   auto dependent_error = [filename, &error]() {
     error = filename + ": error in " + error;
@@ -3720,7 +3720,7 @@ static bool save_ply_scene(const string& filename, const scene_model& scene,
     string& error, bool noparallel) {
   auto shape_error = [filename, &error]() {
     error = filename + ": empty shape";
-    return false;
+    return true;
   };
 
   if (scene.shapes.empty()) return shape_error();
@@ -3763,7 +3763,7 @@ static bool save_stl_scene(const string& filename, const scene_model& scene,
     string& error, bool noparallel) {
   auto shape_error = [filename, &error]() {
     error = filename + ": empty shape";
-    return false;
+    return true;
   };
 
   if (scene.shapes.empty()) return shape_error();

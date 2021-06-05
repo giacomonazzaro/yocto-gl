@@ -5,8 +5,8 @@
 
 using namespace yocto;
 
-scene_camera& add_camera(scene_model& scene, const frame3f& frame, float lens,
-    float aspect, float aperture = 0, float focus = 10,
+inline scene_camera& add_camera(scene_model& scene, const frame3f& frame,
+    float lens, float aspect, float aperture = 0, float focus = 10,
     bool orthographic = false, float film = 0.036) {
   auto& camera        = scene.cameras.emplace_back();
   camera.frame        = frame;
@@ -19,21 +19,22 @@ scene_camera& add_camera(scene_model& scene, const frame3f& frame, float lens,
   return camera;
 }
 
-scene_instance& add_instance(scene_model& scene, int shape, int material) {
+inline scene_instance& add_instance(
+    scene_model& scene, int shape, int material) {
   auto& instance    = scene.instances.emplace_back();
   instance.shape    = shape;
   instance.material = material;
   return instance;
 }
 
-int add_shape(scene_model& scene, const scene_shape& shape_data) {
+inline int add_shape(scene_model& scene, const scene_shape& shape_data) {
   auto  id    = (int)scene.shapes.size();
   auto& shape = scene.shapes.emplace_back();
   shape       = shape_data;
   return id;
 }
 
-int add_material(scene_model& scene, const vec3f& color, float roughness,
+inline int add_material(scene_model& scene, const vec3f& color, float roughness,
     bool unlit = false) {
   auto  id           = (int)scene.materials.size();
   auto& material     = scene.materials.emplace_back();
@@ -70,7 +71,7 @@ int add_material(scene_model& scene, const vec3f& color, float roughness,
 //   return ppositions;
 // }
 
-scene_shape path_to_lines(const vector<vec3i>& triangles,
+inline scene_shape path_to_lines(const vector<vec3i>& triangles,
     const vector<vec3f>& positions, const vector<vec3f>& path, float radius) {
   auto shape      = scene_shape{};
   shape.positions = path;  // eval_positions(triangles, positions, path);
@@ -81,7 +82,7 @@ scene_shape path_to_lines(const vector<vec3i>& triangles,
   return shape;
 }
 
-scene_shape path_to_points(const vector<vec3i>& triangles,
+inline scene_shape path_to_points(const vector<vec3i>& triangles,
     const vector<vec3f>& positions, const vector<vec3f>& path, float radius) {
   auto shape      = scene_shape{};
   shape.positions = path;  // eval_positions(triangles, positions, path);
@@ -92,7 +93,7 @@ scene_shape path_to_points(const vector<vec3i>& triangles,
   return shape;
 }
 
-scene_shape polyline_shape(const vector<vec3f>& positions,
+inline scene_shape polyline_shape(const vector<vec3f>& positions,
     float point_thickness, float line_thickness) {
   //  auto positions = eval_positions(triangles, positions, path);
   auto shape = scene_shape{};
@@ -120,38 +121,39 @@ scene_shape polyline_shape(const vector<vec3f>& positions,
   return shape;
 }
 
-void make_scene_floating(const spline_mesh& mesh, scene_model& scene,
-    vec3f camera_from, vec3f camera_to, float camera_lens, float camera_aspect,
-    const vector<mesh_point>& points, const vector<vec3f>& path,
-    const vector<vec3f>& curve, bool use_environment = false,
-    float point_thickness = 0.006f, float line_thickness = 0.004f) {
+inline void make_scene_floating(const spline_mesh& mesh, scene_model& scene,
+    const scene_camera& camera, const vector<mesh_point>& points,
+    const vector<vec3f>& path, const vector<vec3f>& curve,
+    bool use_environment = false, float point_thickness = 0.006f,
+    float line_thickness = 0.004f) {
   // camera
   // camera_from.x += 0.5;
   // camera_from.y += 0.5;
-  add_camera(scene, lookat_frame(camera_from, camera_to, {0, 1, 0}),
-      camera_lens, camera_aspect, 0, length(camera_from - camera_to));
+  scene.cameras.push_back(camera);
 
   // mesh
   auto mesh_color = vec3f{0.8, 0.8, 0.8};
   add_instance(
       scene, add_shape(scene, mesh), add_material(scene, mesh_color, 0.5));
 
-  auto edges = scene_shape{};
-  for (auto& tr : mesh.triangles) {
-    for (int k = 0; k < 3; k++) {
-      auto a = tr[k];
-      auto b = tr[(k + 1) % 3];
-      if (a > b) continue;
-      auto index = (int)edges.positions.size();
-      edges.radius.push_back(0.001);
-      edges.radius.push_back(0.001);
-      edges.lines.push_back({index, index + 1});
-      edges.positions.push_back(mesh.positions[a]);
-      edges.positions.push_back(mesh.positions[b]);
+  if (0) {
+    auto edges = scene_shape{};
+    for (auto& tr : mesh.triangles) {
+      for (int k = 0; k < 3; k++) {
+        auto a = tr[k];
+        auto b = tr[(k + 1) % 3];
+        if (a > b) continue;
+        auto index = (int)edges.positions.size();
+        edges.radius.push_back(0.001);
+        edges.radius.push_back(0.001);
+        edges.lines.push_back({index, index + 1});
+        edges.positions.push_back(mesh.positions[a]);
+        edges.positions.push_back(mesh.positions[b]);
+      }
     }
+    add_instance(scene, add_shape(scene, edges),
+        add_material(scene, mesh_color * 0.75, 1.0, false));
   }
-  add_instance(scene, add_shape(scene, edges),
-      add_material(scene, mesh_color * 0.75, 1.0, false));
 
   auto control_polygon = polyline_positions(mesh, points);
   // vector<mesh_point>{};
@@ -191,6 +193,40 @@ void make_scene_floating(const spline_mesh& mesh, scene_model& scene,
       add_material(scene, {0, 0, 1}, 0.2));
 }
 
+// default camera
+struct camera_settings {
+  vec3f from   = {0, 0, 3};
+  vec3f to     = {0, 0, 0};
+  float lens   = 0.100f;
+  float aspect = 0;
+};
+
+inline void save_scene(const string& scene_name, const string& mesh_name,
+    const spline_mesh& mesh, const vector<vec3f>& bezier,
+    const vector<vec3f>& control_polygon, const vector<mesh_point>& points,
+    const scene_camera& camera) {
+  string ioerror;
+  if (!make_directory(path_dirname(scene_name), ioerror)) print_fatal(ioerror);
+  if (!make_directory(path_join(path_dirname(scene_name), "shapes"), ioerror))
+    print_fatal(ioerror);
+  if (!make_directory(path_join(path_dirname(scene_name), "textures"), ioerror))
+    print_fatal(ioerror);
+
+  //  print_progress("save scene", progress.x++, progress.y++);
+  auto scene_timer = simple_timer{};
+  auto scene       = scene_model{};
+
+  make_scene_floating(mesh, scene, camera, points, control_polygon, bezier);
+
+  if (!save_scene(scene_name, scene, ioerror)) {
+    printf("%s: %s\n", __FUNCTION__, ioerror.c_str());
+    print_fatal(ioerror);
+  }
+  // stats["scene"]             =
+  //        json_value::object(); stats["scene"]["time"]     =
+  //        elapsed_nanoseconds(scene_timer); stats["scene"]["filename"] =
+  //        scene_name;
+}
 // Save a path
 // bool save_mesh_points(
 //    const string& filename, const vector<mesh_point>& path, string& error) {
