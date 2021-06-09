@@ -14,7 +14,7 @@ struct spline_mesh : scene_shape {
   vector<vec3i>        adjacencies     = {};
   dual_geodesic_solver dual_solver     = {};
   shape_bvh            bvh             = {};
-  flipout_mesh         flipout_mesh    = {};
+  Flipout_Mesh         flipout_mesh    = {};
   bbox3f               bbox            = invalidb3f;
   float                max_edge_length = 0;
 };
@@ -31,7 +31,7 @@ inline vector<mesh_point> shortest_path(
 
 inline vector<vec3f> polyline_positions(
     const spline_mesh& mesh, const vector<mesh_point>& control_points) {
-    if(control_points.empty()) return {};
+  if (control_points.empty()) return {};
   auto points = vector<mesh_point>{};
   for (int i = 0; i < control_points.size() - 1; i++) {
     auto a  = control_points[i];

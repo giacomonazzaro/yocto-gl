@@ -8,9 +8,9 @@ using namespace geometrycentral::surface;
 
 namespace flipout {
 
-flipout_mesh make_flipout_mesh(
+Flipout_Mesh make_flipout_mesh(
     const std::vector<vec3i>& triangles, const std::vector<vec3f>& positions) {
-  auto result = flipout_mesh{};
+  auto result = Flipout_Mesh{};
 
   // Copy mesh data to compliant format
   auto polygons           = std::vector<std::vector<size_t>>(triangles.size());
@@ -29,8 +29,8 @@ flipout_mesh make_flipout_mesh(
   return result;
 }
 
-flipout_mesh load_flipout_mesh(const std::string& filename) {
-  auto result                                = flipout_mesh{};
+Flipout_Mesh load_flipout_mesh(const std::string& filename) {
+  auto result                                = Flipout_Mesh{};
   std::tie(result.topology, result.geometry) = readManifoldSurfaceMesh(
       filename);
   return result;

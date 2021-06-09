@@ -41,7 +41,7 @@
 #include "yocto_shading.h"
 #include "yocto_shape.h"
 
-#define YOCTO_DENOISE 0
+//#define YOCTO_DENOISE 0
 
 #if YOCTO_DENOISE
 #include <OpenImageDenoise/oidn.hpp>

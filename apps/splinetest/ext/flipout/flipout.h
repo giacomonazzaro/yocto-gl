@@ -15,7 +15,7 @@ using namespace geometrycentral::surface;
 
 namespace flipout {
 
-struct flipout_mesh {
+struct Flipout_Mesh {
   std::unique_ptr<ManifoldSurfaceMesh>    topology;
   std::unique_ptr<VertexPositionGeometry> geometry;
 };
@@ -25,10 +25,10 @@ struct flipout_path_stats {
   double shortening    = 0;
 };
 
-flipout_mesh make_flipout_mesh(
+Flipout_Mesh make_flipout_mesh(
     const std::vector<vec3i>& triangles, const std::vector<vec3f>& positions);
 
-flipout_mesh load_flipout_mesh(const std::string& filename);
+Flipout_Mesh load_flipout_mesh(const std::string& filename);
 
 std::pair<std::unique_ptr<FlipEdgeNetwork>, flipout_path_stats>
 create_path_from_points(ManifoldSurfaceMesh* mesh,
