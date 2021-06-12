@@ -117,8 +117,11 @@ spline_test load_test(const string& filename, string& error) {
   auto result = spline_test{};
   if (!load_json(filename, js, error)) return {};
   try {
-    result.control_points =
-        js["splines"][0]["control_points"].get<vector<mesh_point>>();
+    for (auto& spline : js["splines"]) {
+      auto v = spline["control_points"].get<vector<mesh_point>>();
+      result.control_points.insert(
+          result.control_points.end(), v.begin(), v.end());
+    }
     result.camera.frame = js["camera"]["frame"];
     result.camera.focus = js["camera"]["focus"];
     // params.algorithm    = js["params"]["algorithm"];

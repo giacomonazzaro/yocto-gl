@@ -12,15 +12,16 @@ using namespace yocto;
 int main(int argc, const char* argv[]) {
   // command line parameters
 
-  auto max_edge_length = 0.0f;
-  auto timings_name    = ""s;
-  auto append_timings  = false;
-  auto scene_name      = ""s;
-  auto mesh_name       = "mesh.ply"s;
-  auto test_name       = "mesh.ply"s;
-  auto algorithm       = "dc-uniform"s;
-  auto params          = spline_params{};
-  auto save            = false;
+  auto  max_edge_length = 0.0f;
+  auto  timings_name    = ""s;
+  auto  append_timings  = false;
+  auto  scene_name      = ""s;
+  auto  mesh_name       = "mesh.ply"s;
+  auto  test_name       = "mesh.ply"s;
+  auto  algorithm       = "dc-uniform"s;
+  auto  params          = spline_params{};
+  auto  save            = false;
+  float line_thickness  = 0.004f;
 
   // parse command line
   auto cli = make_cli("splinetime", "Applies operations on a triangle mesh");
@@ -32,6 +33,7 @@ int main(int argc, const char* argv[]) {
   add_option(cli, "test", test_name, "test path");
   add_option(cli, "scene", scene_name, "scene name");
 
+  add_option(cli, "line-thickness", line_thickness, "line thickness");
   add_option(cli, "timings", timings_name, "output timings");
   add_option(cli, "append-timings", append_timings, "append timings");
   add_option(cli, "max-edge-legth", max_edge_length, "max edge length");
@@ -99,16 +101,17 @@ int main(int argc, const char* argv[]) {
   // output timings
   if (timings_name.size() && !append_timings) {
     auto timings_file = fopen(timings_name.c_str(), "w");
-    fprintf(
-        timings_file, "model,triangles,num_points,bezier(s),max_angle(rad)\n");
+    fprintf(timings_file,
+        "model,triangles,num_points,bezier_tot(s),bezier_avg(s),num_control_points,max_angle(rad)\n");
     fclose(timings_file);
   }
 
   if (timings_name.size()) {
     auto timings_file = fopen(timings_name.c_str(), "a");
-    fprintf(timings_file, "%s, %d, %d, %.15f, %f\n", mesh_name.c_str(),
-        (int)mesh.triangles.size(), (int)stats.positions.size(), stats.seconds,
-        stats.max_angle);
+    fprintf(timings_file, "%s, %d, %d, %.15f, %.15f, %d, %f\n",
+        mesh_name.c_str(), (int)mesh.triangles.size(),
+        (int)stats.positions.size(), stats.seconds, stats.seconds_avg,
+        stats.num_control_points, stats.max_angle);
     fclose(timings_file);
   }
 
@@ -117,7 +120,7 @@ int main(int argc, const char* argv[]) {
     auto control_polygon = polyline_positions(mesh, spline_test.control_points);
     auto control_points  = spline_test.control_points;
     save_scene(scene_name, mesh_name, mesh, curve, control_polygon,
-        control_points, spline_test.camera);
+        control_points, spline_test.camera, line_thickness);
   }
 
   // else {

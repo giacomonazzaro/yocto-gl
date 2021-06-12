@@ -124,8 +124,8 @@ inline scene_shape polyline_shape(const vector<vec3f>& positions,
 inline void make_scene_floating(const spline_mesh& mesh, scene_model& scene,
     const scene_camera& camera, const vector<mesh_point>& points,
     const vector<vec3f>& path, const vector<vec3f>& curve,
-    bool use_environment = false, float point_thickness = 0.006f,
     float line_thickness = 0.004f) {
+  float point_thickness = (line_thickness * 3) / 2;
   // camera
   // camera_from.x += 0.5;
   // camera_from.y += 0.5;
@@ -204,7 +204,7 @@ struct camera_settings {
 inline void save_scene(const string& scene_name, const string& mesh_name,
     const spline_mesh& mesh, const vector<vec3f>& bezier,
     const vector<vec3f>& control_polygon, const vector<mesh_point>& points,
-    const scene_camera& camera) {
+    const scene_camera& camera, float line_thickness = 0.004) {
   string ioerror;
   if (!make_directory(path_dirname(scene_name), ioerror)) print_fatal(ioerror);
   if (!make_directory(path_join(path_dirname(scene_name), "shapes"), ioerror))
@@ -216,7 +216,8 @@ inline void save_scene(const string& scene_name, const string& mesh_name,
   auto scene_timer = simple_timer{};
   auto scene       = scene_model{};
 
-  make_scene_floating(mesh, scene, camera, points, control_polygon, bezier);
+  make_scene_floating(
+      mesh, scene, camera, points, control_polygon, bezier, line_thickness);
 
   if (!save_scene(scene_name, scene, ioerror)) {
     printf("%s: %s\n", __FUNCTION__, ioerror.c_str());

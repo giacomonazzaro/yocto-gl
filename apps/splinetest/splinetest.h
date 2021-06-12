@@ -54,8 +54,10 @@ struct shortest_path_stats {
 struct bezier_test {
   vector<vec3f> positions          = {};
   double        seconds            = 0;
+  double        seconds_avg        = 0;
   float         max_angle          = 0;
   float         max_segment_length = 0;
+  int           num_control_points = 0;
 };
 
 inline shortest_path_stats test_shortest_path(const spline_mesh& mesh,
@@ -327,6 +329,8 @@ inline bezier_test test_bezier_curve(const spline_mesh& mesh,
     auto len = length(result.positions[i] - result.positions[i - 1]);
     result.max_segment_length = yocto::max(len, result.max_segment_length);
   }
+  result.num_control_points = (int)control_points.size();
+  result.seconds_avg = result.seconds / ((result.num_control_points - 1) / 3);
   return result;
 }
 

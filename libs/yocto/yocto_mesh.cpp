@@ -52,7 +52,7 @@
 
 // #define TESTS_MAY_FAIL
 
-#define SPLINE_DEBUG 1
+#define SPLINE_DEBUG 0
 #define YOCTO_BEZIER_PRECISE 1
 #define YOCTO_BEZIER_DOUBLE 1
 #define UNFOLD_INTERSECTING_CIRCLES 0
@@ -3392,12 +3392,12 @@ void straighten_path(geodesic_path& path, const vector<vec3i>& triangles,
 
   auto bend = max_curvature_point();
 
-#if YOCTO_BEZIER_PRECISE == 0
+//#if YOCTO_BEZIER_PRECISE == 0
   auto max_iterations = path.strip.size() * 2;
   for (auto i = 0; i < max_iterations && bend.index != -1; i++) {
-#else
-  while (bend.index != -1) {
-#endif
+//#else
+//  while (bend.index != -1) {
+//#endif
     path.strip = fix_strip(
         adjacencies, path.strip, bend.index, bend.k, bend.flank_left);
 

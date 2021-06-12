@@ -101,8 +101,8 @@ def render(dirname, output):
         retcode = subprocess.run(cmd, timeout=600, shell=True).returncode
 
 
-# algorithms = [('dc-uniform',4), ('dc-adaptive',4), ('lr-uniform',4), ('lr-adaptive',4)]
-algorithms = [('dc-uniform',4)]
+algorithms = [('dc-uniform',4), ('dc-adaptive',4), ('lr-uniform',4), ('lr-adaptive',4), ('flipout',4)]
+# algorithms = [('dc-uniform',4)]
 # algorithms = [('flipout',4)]
 
 def trace_all(dir):
